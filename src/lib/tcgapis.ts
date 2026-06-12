@@ -1,0 +1,152 @@
+// Server-side TCGAPIs client. NEVER import this in client components.
+
+const BASE = "https://api.tcgapis.com";
+
+function headers() {
+  const key = process.env.TCGAPIS_API_KEY;
+  if (!key) throw new Error("TCGAPIS_API_KEY is not set");
+  return { "x-api-key": key };
+}
+
+async function getJson<T>(path: string): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, { headers: headers(), cache: "no-store" });
+  if (!res.ok) throw new Error(`TCGAPIs ${path} -> ${res.status}`);
+  return res.json() as Promise<T>;
+}
+
+export interface ApiList<T> {
+  success: boolean;
+  count: number;
+  total?: number;
+  offset?: number;
+  limit?: number;
+  data: T[];
+}
+
+export interface ApiGame { categoryId: number; name: string; displayName: string }
+export interface ApiExpansion {
+  groupId: number; name: string; abbreviation?: string; publishedOn?: string;
+}
+export interface ApiCard {
+  productId: number; name: string; image?: string; imageUrl?: string;
+  rarity?: string; number?: string; cleanName?: string;
+}
+
+export async function fetchGames() {
+  return getJson<ApiList<ApiGame>>("/api/v2/games?limit=100");
+}
+
+export async function fetchExpansions(categoryId: number) {
+  const out: ApiExpansion[] = [];
+  let offset = 0;
+  for (;;) {
+    const page = await getJson<ApiList<ApiExpansion>>(
+      `/api/v2/expansions/${categoryId}?limit=100&offset=${offset}`
+    );
+    out.push(...page.data);
+    offset += page.data.length;
+    if (!page.total || offset >= page.total || page.data.length === 0) break;
+  }
+  return out;
+}
+
+export async function fetchCards(groupId: number) {
+  const out: ApiCard[] = [];
+  let offset = 0;
+  for (;;) {
+    const page = await getJson<ApiList<ApiCard>>(
+      `/api/v2/cards/${groupId}?limit=100&offset=${offset}`
+    );
+    out.push(...page.data);
+    offset += page.data.length;
+    if (!page.total || offset >= page.total || page.data.length === 0) break;
+  }
+  return out;
+}
+
+// Whole-game price CSV (one request per game per cycle — the only way
+// full-catalog sync scales).
+export async function fetchPricesCsv(gameName: string): Promise<string> {
+  const res = await fetch(`${BASE}/csv/prices/${encodeURIComponent(gameName)}`, {
+    headers: headers(),
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`prices CSV ${gameName} -> ${res.status}`);
+  return res.text();
+}
+
+// Cardmarket price guide for a single product (used for the blended
+// overlay on actively-traded cards only).
+export interface CardmarketPrice {
+  idProduct: number;
+  low: number | null; avg: number | null; trend: number | null;
+  avg1: number | null; avg7: number | null; avg30: number | null;
+  "trend-foil": number | null; "avg7-foil": number | null; "avg30-foil": number | null;
+}
+export async function fetchCardmarketPrice(idProduct: number) {
+  const json = await getJson<{ success: boolean; data: CardmarketPrice }>(
+    `/api/v2/cardmarket/prices/${idProduct}`
+  );
+  return json.data;
+}
+
+// Historic prices for one product (card-detail backfill, optional)
+export async function fetchHistoricPrices(productId: number) {
+  return getJson<{ success: boolean; data: unknown }>(
+    `/api/v2/historic-prices/${productId}`
+  );
+}
+
+// ---------------- CSV parsing ----------------
+// Tolerant CSV parser (handles quoted fields with commas/newlines).
+export function parseCsv(text: string): Record<string, string>[] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = "";
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++; }
+        else inQuotes = false;
+      } else field += ch;
+    } else if (ch === '"') {
+      inQuotes = true;
+    } else if (ch === ",") {
+      row.push(field); field = "";
+    } else if (ch === "\n" || ch === "\r") {
+      if (ch === "\r" && text[i + 1] === "\n") i++;
+      row.push(field); field = "";
+      if (row.length > 1 || row[0] !== "") rows.push(row);
+      row = [];
+    } else field += ch;
+  }
+  if (field !== "" || row.length) { row.push(field); rows.push(row); }
+  if (rows.length < 2) return [];
+  const header = rows[0].map((h) => h.trim());
+  return rows.slice(1).map((r) => {
+    const obj: Record<string, string> = {};
+    header.forEach((h, idx) => { obj[h] = r[idx] ?? ""; });
+    return obj;
+  });
+}
+
+// Column names in the prices CSV can vary; resolve tolerantly.
+export function pick(row: Record<string, string>, candidates: string[]): string {
+  for (const c of candidates) {
+    if (row[c] !== undefined && row[c] !== "") return row[c];
+    const lower = Object.keys(row).find((k) => k.toLowerCase() === c.toLowerCase());
+    if (lower && row[lower] !== "") return row[lower];
+  }
+  return "";
+}
+
+export const COL = {
+  productId: ["productId", "product_id", "ProductId", "id"],
+  variant: ["subTypeName", "subtype", "printing", "variant", "SubTypeName"],
+  marketPrice: ["marketPrice", "market_price", "MarketPrice", "price"],
+  midPrice: ["midPrice", "mid_price"],
+  lowPrice: ["lowPrice", "low_price"],
+  name: ["name", "productName"],
+};

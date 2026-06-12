@@ -1,0 +1,14 @@
+src/app/auth/callback/route.ts(20,18): error TS7006: Parameter 'cookiesToSet' implicitly has an 'any' type.
+src/app/auth/callback/route.ts(21,37): error TS7031: Binding element 'name' implicitly has an 'any' type.
+src/app/auth/callback/route.ts(21,43): error TS7031: Binding element 'value' implicitly has an 'any' type.
+src/app/auth/callback/route.ts(21,50): error TS7031: Binding element 'options' implicitly has an 'any' type.
+src/lib/supabase/middleware.ts(15,16): error TS7006: Parameter 'cookiesToSet' implicitly has an 'any' type.
+src/lib/supabase/middleware.ts(16,35): error TS7031: Binding element 'name' implicitly has an 'any' type.
+src/lib/supabase/middleware.ts(16,41): error TS7031: Binding element 'value' implicitly has an 'any' type.
+src/lib/supabase/middleware.ts(20,35): error TS7031: Binding element 'name' implicitly has an 'any' type.
+src/lib/supabase/middleware.ts(20,41): error TS7031: Binding element 'value' implicitly has an 'any' type.
+src/lib/supabase/middleware.ts(20,48): error TS7031: Binding element 'options' implicitly has an 'any' type.
+src/lib/supabase/server.ts(14,16): error TS7006: Parameter 'cookiesToSet' implicitly has an 'any' type.
+src/lib/supabase/server.ts(16,37): error TS7031: Binding element 'name' implicitly has an 'any' type.
+src/lib/supabase/server.ts(16,43): error TS7031: Binding element 'value' implicitly has an 'any' type.
+src/lib/supabase/server.ts(16,50): error TS7031: Binding element 'options' implicitly has an 'any' type.
