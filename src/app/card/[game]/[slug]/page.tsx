@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { serverClient } from "@/lib/supabase/server";
 import RangeChart from "@/components/RangeChart";
-import TradePanel from "@/components/TradePanel";
+import TradePanel, { LeagueCtx } from "@/components/TradePanel";
 import OrderFlow from "@/components/OrderFlow";
 import { usd, pct, pctClass } from "@/lib/format";
 
@@ -70,15 +70,49 @@ export default async function CardPage({
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  let leagues: { id: string; name: string }[] = [];
+
+  let leagues: LeagueCtx[] = [];
   if (user) {
-    const { data } = await supabase
-      .from("league_members")
-      .select("leagues(id, name)")
-      .eq("user_id", user.id);
-    leagues = (data ?? [])
-      .map((r) => r.leagues as unknown as { id: string; name: string })
-      .filter(Boolean);
+    const [{ data: ports }, { data: lb }, { data: pend }] = await Promise.all([
+      supabase
+        .from("portfolios")
+        .select("id, cash, league_id, leagues(id, name, max_position_pct)")
+        .eq("user_id", user.id),
+      supabase.from("v_leaderboard").select("league_id, value").eq("user_id", user.id),
+      supabase
+        .from("orders")
+        .select("id, side, qty, est_price, league_id")
+        .eq("user_id", user.id).eq("asset_id", active.id).eq("status", "pending"),
+    ]);
+    const portIds = (ports ?? []).map((p) => p.id);
+    const [{ data: holds }, { data: elig }] = await Promise.all([
+      portIds.length
+        ? supabase.from("holdings")
+            .select("portfolio_id, qty, avg_cost").in("portfolio_id", portIds).eq("asset_id", active.id)
+        : Promise.resolve({ data: [] as { portfolio_id: string; qty: number; avg_cost: number }[] }),
+      supabase.rpc("eligible_leagues_for_asset", { p_asset_id: active.id }),
+    ]);
+    const eligibleIds = new Set((elig ?? []).map((r: { league_id: string }) => r.league_id));
+    const holdByPort = new Map((holds ?? []).map((h) => [h.portfolio_id, h]));
+    const valueByLeague = new Map((lb ?? []).map((r) => [r.league_id, Number(r.value)]));
+
+    leagues = (ports ?? []).map((p) => {
+      const l = p.leagues as unknown as { id: string; name: string; max_position_pct: number };
+      const h = holdByPort.get(p.id) as { qty: number; avg_cost: number } | undefined;
+      return {
+        id: p.league_id,
+        name: l?.name ?? "League",
+        cash: Number(p.cash),
+        maxPct: Number(l?.max_position_pct ?? 25),
+        value: valueByLeague.get(p.league_id) ?? Number(p.cash),
+        holdingQty: h?.qty ?? 0,
+        holdingAvg: Number(h?.avg_cost ?? 0),
+        eligible: eligibleIds.has(p.league_id),
+        pending: (pend ?? [])
+          .filter((o) => o.league_id === p.league_id)
+          .map((o) => ({ id: o.id, side: o.side, qty: o.qty, est_price: o.est_price })),
+      };
+    });
   }
 
   const { data: cycle } = await supabase.rpc("current_open_cycle").maybeSingle();

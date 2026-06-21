@@ -1,84 +1,100 @@
 import Link from "next/link";
 import { serverClient } from "@/lib/supabase/server";
-import LeagueForms from "@/components/LeagueForms";
+import CreateGameForm, { SetLite } from "@/components/CreateGameForm";
+import JoinGame from "@/components/JoinGame";
+import GameCountdown from "@/components/GameCountdown";
+import { universeLabel } from "@/lib/universe";
 import { Users, Globe } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
-export default async function LeaguesPage() {
-  const supabase = await serverClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+interface GameRow {
+  id: string; name: string; is_global: boolean; join_policy: string;
+  starting_cash: number; starts_at: string; ends_at: string | null;
+  universe: Record<string, unknown>; member_count: number; game_status: string;
+}
 
-  const myLeagueIds = new Set<string>();
+function GameCard({ g, joined }: { g: GameRow; joined?: boolean }) {
+  return (
+    <Link href={`/leagues/${g.id}`}
+      className="panel flex flex-col gap-2 p-5 transition hover:-translate-y-0.5">
+      <div className="flex items-start justify-between gap-2">
+        <p className="font-black">{g.name}</p>
+        {g.is_global ? <Globe size={18} className="text-blue-400" />
+          : <span className="chip bg-slate-100 text-slate-500">{g.join_policy}</span>}
+      </div>
+      <p className="text-xs font-bold text-slate-400">{universeLabel(g.universe)}</p>
+      <div className="flex items-center justify-between pt-1">
+        <span className="inline-flex items-center gap-1 text-sm font-bold text-slate-500">
+          <Users size={14} /> {g.member_count}
+        </span>
+        <GameCountdown startsAt={g.starts_at} endsAt={g.ends_at}
+          status={g.game_status} isGlobal={g.is_global} />
+      </div>
+      {!g.is_global && (
+        <p className="text-xs font-bold text-slate-400">
+          ${Number(g.starting_cash).toLocaleString()} start
+        </p>
+      )}
+      {joined === false && g.join_policy === "open" && (
+        <span className="mt-1 text-xs font-extrabold text-blue-600">Tap to view &amp; join →</span>
+      )}
+    </Link>
+  );
+}
+
+export default async function GamesPage() {
+  const supabase = await serverClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const mineIds = new Set<string>();
   if (user) {
-    const { data } = await supabase
-      .from("league_members")
-      .select("league_id")
-      .eq("user_id", user.id);
-    (data ?? []).forEach((r) => myLeagueIds.add(r.league_id));
+    const { data } = await supabase.from("league_members").select("league_id").eq("user_id", user.id);
+    (data ?? []).forEach((r) => mineIds.add(r.league_id));
   }
 
-  const { data: leagues } = await supabase
-    .from("leagues")
-    .select("id, name, is_public, is_global, invite_code, starting_cash, owner_id, created_at")
+  const { data: games } = await supabase
+    .from("v_games").select("*")
     .order("is_global", { ascending: false })
-    .order("created_at", { ascending: false });
+    .order("member_count", { ascending: false });
 
-  const mine = (leagues ?? []).filter((l) => myLeagueIds.has(l.id));
-  const publicLeagues = (leagues ?? []).filter(
-    (l) => l.is_public && !myLeagueIds.has(l.id)
-  );
+  const all = (games ?? []) as GameRow[];
+  const mine = all.filter((g) => mineIds.has(g.id));
+  const open = all.filter((g) => !mineIds.has(g.id) && g.join_policy === "open" && g.game_status !== "ended");
+
+  const { data: setData } = await supabase
+    .from("v_sets").select("slug, name, group_id, game_slug").order("name");
+  const sets = (setData ?? []) as SetLite[];
 
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-black">Leagues</h1>
+      <h1 className="text-2xl font-black">Games</h1>
 
       <section className="space-y-3">
-        <h2 className="flex items-center gap-2 font-black text-slate-600">
-          <Users size={18} /> Your leagues
-        </h2>
+        <h2 className="flex items-center gap-2 font-black text-slate-600"><Users size={18} /> Your games</h2>
         {!mine.length ? (
           <p className="panel p-6 font-bold text-slate-400">
-            {user ? "You haven't joined any leagues yet." : "Sign in to join leagues."}
+            {user ? "You haven't joined any games yet." : "Sign in to play."}
           </p>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2">
-            {mine.map((l) => (
-              <Link
-                key={l.id}
-                href={`/leagues/${l.id}`}
-                className="panel flex items-center justify-between p-5 transition hover:-translate-y-0.5"
-              >
-                <div>
-                  <p className="font-black">{l.name}</p>
-                  <p className="text-xs font-bold text-slate-400">
-                    {l.is_global ? "Everyone plays here" : l.is_public ? "Public league" : "Private league"}
-                    {" · "}${Number(l.starting_cash).toLocaleString()} start
-                  </p>
-                </div>
-                {l.is_global && <Globe className="text-blue-400" size={20} />}
-              </Link>
-            ))}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {mine.map((g) => <GameCard key={g.id} g={g} />)}
           </div>
         )}
       </section>
 
-      {user && <LeagueForms />}
+      {user && (
+        <section className="grid gap-4 lg:grid-cols-2">
+          <CreateGameForm sets={sets} />
+          <JoinGame />
+        </section>
+      )}
 
-      {publicLeagues.length > 0 && (
+      {open.length > 0 && (
         <section className="space-y-3">
-          <h2 className="font-black text-slate-600">Public leagues</h2>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {publicLeagues.map((l) => (
-              <Link key={l.id} href={`/leagues/${l.id}`} className="panel p-5">
-                <p className="font-black">{l.name}</p>
-                <p className="text-xs font-bold text-slate-400">
-                  ${Number(l.starting_cash).toLocaleString()} start
-                </p>
-              </Link>
-            ))}
+          <h2 className="font-black text-slate-600">Open games to join</h2>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {open.map((g) => <GameCard key={g.id} g={g} joined={false} />)}
           </div>
         </section>
       )}

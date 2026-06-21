@@ -22,7 +22,7 @@ export default function Navbar({ username }: { username: string | null }) {
             <span className="flex items-center gap-1.5"><Briefcase size={16} /> Portfolio</span>
           </Link>
           <Link href="/leagues" className="rounded-xl px-3 py-2 hover:bg-slate-100">
-            <span className="flex items-center gap-1.5"><Users size={16} /> Leagues</span>
+            <span className="flex items-center gap-1.5"><Users size={16} /> Games</span>
           </Link>
           <Link href="/leaderboard" className="rounded-xl px-3 py-2 hover:bg-slate-100">
             <span className="flex items-center gap-1.5"><Trophy size={16} /> Leaderboard</span>

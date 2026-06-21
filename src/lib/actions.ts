@@ -37,17 +37,34 @@ export async function cancelOrder(orderId: string): Promise<ActionResult> {
   return { ok: true, message: "Order cancelled" };
 }
 
-export async function createLeague(formData: FormData): Promise<ActionResult & { leagueId?: string }> {
+export interface UniverseRules {
+  games?: string[];
+  set_ids?: number[];
+  rarities?: string[];
+  name_like?: string;
+  sealed?: "any" | "only" | "exclude";
+}
+
+export async function createGame(input: {
+  name: string;
+  joinPolicy: "open" | "invite";
+  startingCash: number;
+  maxPositionPct: number;
+  durationDays: number;
+  universe: UniverseRules;
+}): Promise<ActionResult & { leagueId?: string }> {
   const supabase = await serverClient();
-  const { data, error } = await supabase.rpc("create_league", {
-    p_name: String(formData.get("name") ?? ""),
-    p_is_public: formData.get("is_public") === "on",
-    p_starting_cash: Number(formData.get("starting_cash") ?? 10000),
-    p_max_position_pct: Number(formData.get("max_position_pct") ?? 25),
+  const { data, error } = await supabase.rpc("create_game", {
+    p_name: input.name,
+    p_join_policy: input.joinPolicy,
+    p_starting_cash: input.startingCash,
+    p_max_position_pct: input.maxPositionPct,
+    p_duration_days: input.durationDays,
+    p_universe: input.universe,
   });
   if (error) return { ok: false, message: error.message };
   revalidatePath("/leagues");
-  return { ok: true, message: "League created", leagueId: data?.id };
+  return { ok: true, message: "Game created", leagueId: data?.id };
 }
 
 export async function joinLeague(code: string): Promise<ActionResult> {
