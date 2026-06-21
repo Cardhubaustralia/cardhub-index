@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { serverClient } from "@/lib/supabase/server";
-import PriceChart from "@/components/PriceChart";
+import RangeChart from "@/components/RangeChart";
 import TradePanel from "@/components/TradePanel";
 import { usd, pct, pctClass } from "@/lib/format";
 
@@ -151,17 +151,7 @@ export default async function CardPage({
           </div>
 
           <section className="panel p-5">
-            <h2 className="mb-3 font-black">Price history — 90 days</h2>
-            {chartData.length > 1 ? (
-              <PriceChart
-                data={chartData}
-                up={(active.change_30d_pct ?? active.change_pct ?? 0) >= 0}
-              />
-            ) : (
-              <p className="py-10 text-center font-bold text-slate-400">
-                History builds up as cycles run — check back after a few price updates.
-              </p>
-            )}
+            <RangeChart data={chartData} />
           </section>
 
           {assets.length > 1 && (

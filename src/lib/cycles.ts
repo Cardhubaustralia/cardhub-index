@@ -47,6 +47,7 @@ export async function tick(
         await syncCardmarketOverlay(db, 500, log);
         await syncAllPrices(db, c.id, log);
         await db.rpc("refresh_long_changes");
+        await db.rpc("snapshot_market_index", { p_cycle_id: c.id });
         await db
           .from("trade_cycles")
           .update({ prices_synced_at: new Date().toISOString() })
@@ -72,6 +73,7 @@ export async function tick(
         log(`cycle ${c.id}: retrying price sync…`);
         await syncAllPrices(db, c.id, log);
         await db.rpc("refresh_long_changes");
+        await db.rpc("snapshot_market_index", { p_cycle_id: c.id });
         await db
           .from("trade_cycles")
           .update({ prices_synced_at: new Date().toISOString() })

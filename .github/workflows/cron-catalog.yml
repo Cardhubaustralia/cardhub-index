@@ -1,0 +1,28 @@
+name: Daily catalog sync
+
+# Pulls any new Pokémon / One Piece sets & cards once a day.
+on:
+  schedule:
+    - cron: "30 17 * * *" # 17:30 UTC ≈ 3:30am Sydney
+  workflow_dispatch: {}
+
+concurrency:
+  group: cardhub-catalog
+  cancel-in-progress: false
+
+jobs:
+  catalog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run sync:catalog
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://lqwmsrwoyoalcuzxkzsu.supabase.co
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          TCGAPIS_API_KEY: ${{ secrets.TCGAPIS_API_KEY }}

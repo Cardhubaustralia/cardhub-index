@@ -186,7 +186,15 @@ export default async function PortfolioPage({
       </section>
 
       <section className="panel overflow-hidden">
-        <h2 className="px-5 pt-4 font-black">Recent orders</h2>
+        <div className="flex items-center justify-between px-5 pt-4">
+          <h2 className="font-black">Recent orders</h2>
+          <Link
+            href={`/portfolio/history?league=${active.league_id}`}
+            className="text-sm font-extrabold text-blue-600 hover:underline"
+          >
+            Full history →
+          </Link>
+        </div>
         {!orders?.length ? (
           <p className="px-5 pb-6 pt-2 font-bold text-slate-400">No orders yet.</p>
         ) : (

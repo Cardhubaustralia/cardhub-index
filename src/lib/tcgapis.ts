@@ -64,14 +64,21 @@ export async function fetchCards(groupId: number) {
   return out;
 }
 
-// Whole-game price CSV (one request per game per cycle — the only way
-// full-catalog sync scales).
-export async function fetchPricesCsv(gameName: string): Promise<string> {
-  const res = await fetch(`${BASE}/csv/prices/${encodeURIComponent(gameName)}`, {
-    headers: headers(),
-    cache: "no-store",
-  });
-  if (!res.ok) throw new Error(`prices CSV ${gameName} -> ${res.status}`);
+// Price CSV. The whole-game CSV is CAPPED at ~7000 rows and has NO
+// productId column, so we fetch PER EXPANSION (uncapped) and match rows
+// back to the catalog by set + name + printing.
+// CSV columns (verified live 2026-06-13):
+//   game,name,set,rarity,condition,price,lowPrice,highPrice,marketPrice,
+//   directLowPrice,currency,marketplace,lastUpdated
+export async function fetchPricesCsv(
+  gameName: string,
+  expansion?: string
+): Promise<string> {
+  const url =
+    `${BASE}/csv/prices/${encodeURIComponent(gameName)}` +
+    (expansion ? `?expansion=${encodeURIComponent(expansion)}` : "");
+  const res = await fetch(url, { headers: headers(), cache: "no-store" });
+  if (!res.ok) throw new Error(`prices CSV ${gameName}/${expansion ?? "all"} -> ${res.status}`);
   return res.text();
 }
 
@@ -143,10 +150,10 @@ export function pick(row: Record<string, string>, candidates: string[]): string 
 }
 
 export const COL = {
-  productId: ["productId", "product_id", "ProductId", "id"],
-  variant: ["subTypeName", "subtype", "printing", "variant", "SubTypeName"],
-  marketPrice: ["marketPrice", "market_price", "MarketPrice", "price"],
-  midPrice: ["midPrice", "mid_price"],
-  lowPrice: ["lowPrice", "low_price"],
   name: ["name", "productName"],
+  set: ["set", "expansionName", "expansion"],
+  variant: ["condition", "subTypeName", "printing", "variant"],
+  marketPrice: ["marketPrice", "market_price"],
+  price: ["price"],
+  lowPrice: ["lowPrice", "low_price"],
 };

@@ -93,6 +93,11 @@ export async function fetchEurUsd(): Promise<number> {
 // ------------------------------------------------------------
 export interface PriceSyncResult { game: string; assets: number; skipped: number }
 
+// The prices CSV has no productId column, so we match each row back to
+// the catalog by (set name, product name) — both sides originate from
+// TCGPlayer product names, so exact (case-insensitive) matching is solid.
+const norm = (s: string) => s.trim().toLowerCase();
+
 export async function syncPricesForGame(
   db: SupabaseClient,
   game: (typeof GAMES)[number],
@@ -100,29 +105,42 @@ export async function syncPricesForGame(
   eurUsd: number,
   log: (m: string) => void = console.log
 ): Promise<PriceSyncResult> {
-  const csv = await fetchPricesCsv(game.name);
-  const rows = parseCsv(csv);
-  log(`${game.slug}: ${rows.length} price rows in CSV`);
+  // 1. sets for this game
+  const { data: sets, error: setsErr } = await db
+    .from("sets")
+    .select("group_id, name")
+    .eq("category_id", game.categoryId);
+  if (setsErr) throw new Error(setsErr.message);
 
-  // known productIds so we don't insert assets for cards we haven't catalogued
-  const known = new Set<number>();
+  // 2. card name -> productId map (paged: Supabase caps requests at 1000 rows)
+  const cardMap = new Map<string, number>();
+  let dupNames = 0;
   {
     let from = 0;
-    const page = 50000;
+    const page = 1000;
     for (;;) {
       const { data, error } = await db
         .from("cards")
-        .select("product_id")
+        .select("product_id, group_id, name")
         .eq("category_id", game.categoryId)
+        .order("product_id")
         .range(from, from + page - 1);
       if (error) throw new Error(error.message);
-      (data ?? []).forEach((r: { product_id: number }) => known.add(Number(r.product_id)));
+      for (const r of data ?? []) {
+        const key = `${r.group_id}::${norm(r.name)}`;
+        if (cardMap.has(key)) dupNames++;
+        else cardMap.set(key, Number(r.product_id));
+      }
       if (!data || data.length < page) break;
       from += page;
     }
   }
+  log(`${game.slug}: ${cardMap.size} catalogued products (${dupNames} duplicate names ignored)`);
 
-  // Cardmarket overlay: blend only where we have a CM price (actively-traded set)
+  const setByName = new Map<string, number>();
+  (sets ?? []).forEach((s) => setByName.set(norm(s.name), s.group_id));
+
+  // 3. Cardmarket overlay for the blend
   const { data: cmRows } = await db
     .from("assets")
     .select("product_id, variant, cardmarket_eur")
@@ -137,32 +155,50 @@ export async function syncPricesForGame(
     tcgplayer_price: number; cardmarket_eur: number | null; price_source: string;
     price_updated_at: string;
   };
-  const assets: AssetRow[] = [];
-  let skipped = 0;
+  const assets = new Map<string, AssetRow>(); // dedupe on (productId, variant)
+  let skippedUnknown = 0;
+  let skippedNoPrice = 0;
+  let failedSets = 0;
   const now = new Date().toISOString();
 
-  for (const row of rows) {
-    const pid = Number(pick(row, COL.productId));
-    if (!pid || !known.has(pid)) { skipped++; continue; }
-    const tcg = parseFloat(pick(row, COL.marketPrice) || pick(row, COL.midPrice) || pick(row, COL.lowPrice));
-    if (!tcg || tcg <= 0) { skipped++; continue; }
-    const variant = pick(row, COL.variant) || "Normal";
-    const cmEur = cmMap.get(`${pid}:${variant}`) ?? null;
-    const cmUsd = cmEur ? cmEur * eurUsd : null;
-    const price = cmUsd ? (tcg + cmUsd) / 2 : tcg;
-    assets.push({
-      product_id: pid,
-      variant,
-      price: Math.round(price * 100) / 100,
-      tcgplayer_price: tcg,
-      cardmarket_eur: cmEur,
-      price_source: cmUsd ? "blend" : "tcgplayer",
-      price_updated_at: now,
-    });
+  // 4. one CSV per expansion (the whole-game CSV is capped at ~7000 rows)
+  for (const set of sets ?? []) {
+    let rows: Record<string, string>[];
+    try {
+      rows = parseCsv(await fetchPricesCsv(game.name, set.name));
+    } catch (e) {
+      failedSets++;
+      log(`${game.slug} / ${set.name}: CSV failed (${e}) — skipping set`);
+      continue;
+    }
+    for (const row of rows) {
+      const setName = norm(pick(row, COL.set));
+      const groupId = setByName.get(setName) ?? set.group_id;
+      const pid = cardMap.get(`${groupId}::${norm(pick(row, COL.name))}`);
+      if (!pid) { skippedUnknown++; continue; }
+      const tcg = parseFloat(
+        pick(row, COL.marketPrice) || pick(row, COL.price) || pick(row, COL.lowPrice)
+      );
+      if (!tcg || tcg <= 0) { skippedNoPrice++; continue; }
+      const variant = pick(row, COL.variant) || "Normal";
+      const cmEur = cmMap.get(`${pid}:${variant}`) ?? null;
+      const cmUsd = cmEur ? cmEur * eurUsd : null;
+      const price = cmUsd ? (tcg + cmUsd) / 2 : tcg;
+      assets.set(`${pid}:${variant}`, {
+        product_id: pid,
+        variant,
+        price: Math.round(price * 100) / 100,
+        tcgplayer_price: tcg,
+        cardmarket_eur: cmEur,
+        price_source: cmUsd ? "blend" : "tcgplayer",
+        price_updated_at: now,
+      });
+    }
   }
 
-  // upsert assets: move price -> prev_price via RPC for change calc
-  for (const batch of chunk(assets, 1000)) {
+  // 5. upsert: rolls price -> prev_price + snapshots, via RPC
+  const rows = [...assets.values()];
+  for (const batch of chunk(rows, 1000)) {
     const { error } = await db.rpc("upsert_asset_prices", {
       p_rows: batch,
       p_cycle_id: cycleId,
@@ -170,8 +206,11 @@ export async function syncPricesForGame(
     if (error) throw new Error(`upsert_asset_prices: ${error.message}`);
   }
 
-  log(`${game.slug}: upserted ${assets.length} assets (${skipped} rows skipped)`);
-  return { game: game.slug, assets: assets.length, skipped };
+  log(
+    `${game.slug}: upserted ${rows.length} assets ` +
+    `(${skippedUnknown} rows unmatched, ${skippedNoPrice} no price, ${failedSets} sets failed)`
+  );
+  return { game: game.slug, assets: rows.length, skipped: skippedUnknown + skippedNoPrice };
 }
 
 // Refresh Cardmarket EUR prices for the most actively traded assets

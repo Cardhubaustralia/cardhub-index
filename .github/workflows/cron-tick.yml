@@ -1,0 +1,31 @@
+name: Trade cycle tick
+
+# Advances the trade-cycle state machine: opens/locks/executes cycles and
+# runs the price sync at each lockout. Runs the real Node script on the
+# runner, so the multi-minute price sync has no serverless timeout.
+on:
+  schedule:
+    - cron: "*/5 * * * *" # every 5 minutes (GitHub's minimum interval)
+  workflow_dispatch: {} # lets you run it manually from the Actions tab
+
+# Never let two ticks run at once (a long lockout sync + the next tick).
+concurrency:
+  group: cardhub-cron
+  cancel-in-progress: false
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run cycle:tick
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://lqwmsrwoyoalcuzxkzsu.supabase.co
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          TCGAPIS_API_KEY: ${{ secrets.TCGAPIS_API_KEY }}

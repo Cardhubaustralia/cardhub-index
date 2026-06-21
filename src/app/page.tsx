@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { serverClient } from "@/lib/supabase/server";
 import CardTile, { MarketRow } from "@/components/CardTile";
+import MarketOverview from "@/components/MarketOverview";
 import { Flame, TrendingDown, ShoppingCart, ArrowRight } from "lucide-react";
 
 export const revalidate = 120;
@@ -57,6 +58,8 @@ export default async function Dashboard() {
           bring the exchange to life.
         </section>
       ) : (
+        <>
+        <MarketOverview />
         <div className="grid gap-8 lg:grid-cols-3">
           <section className="space-y-3">
             <h2 className="flex items-center gap-2 text-lg font-black">
@@ -98,6 +101,7 @@ export default async function Dashboard() {
             )}
           </section>
         </div>
+        </>
       )}
     </div>
   );

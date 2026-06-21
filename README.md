@@ -25,6 +25,8 @@ Run the four migrations **in order** in the Supabase SQL Editor (Dashboard → S
 2. `supabase/migrations/0002_trading.sql` — place/cancel order, atomic `execute_cycle`, league functions
 3. `supabase/migrations/0003_rls_views.sql` — RLS policies, leaderboard/movers/market views
 4. `supabase/migrations/0004_sync_fns.sql` — bulk price upsert + sync helpers
+5. `supabase/migrations/0005_market_index.sql` — market index history + dashboard stats
+6. `supabase/migrations/0006_realized_pnl.sql` — realized P&L on sells (account history)
 
 (Or use the Supabase CLI: `supabase db push`.)
 
@@ -43,14 +45,37 @@ npm run sync:prices    # full price snapshot from the whole-game CSVs
 npm run dev
 ```
 
-### 5. Production cron
+### 5. Production cron — GitHub Actions (chosen method)
 
-Deployed on Vercel, `vercel.json` schedules:
+Scheduling runs on **GitHub Actions**, not Vercel — the workflow runs the real
+Node script on the runner, so the multi-minute price sync has no serverless
+timeout, and it's free on any plan.
 
-- `/api/cron/tick` every minute — opens/locks/executes cycles, runs the price sync at each lockout
-- `/api/cron/sync-catalog` daily — picks up new sets
+Workflows (in `.github/workflows/`):
 
-Vercel sends `Authorization: Bearer $CRON_SECRET` automatically when `CRON_SECRET` is set in project env vars. Any other scheduler (GitHub Actions, a VPS crontab running `npm run cycle:tick`) works the same way.
+- `cron-tick.yml` — every 5 min: opens/locks/executes cycles, syncs prices at lockout
+- `cron-catalog.yml` — daily: picks up new sets
+
+**One-time setup:** in the GitHub repo → Settings → Secrets and variables →
+Actions → New repository secret, add:
+
+- `SUPABASE_SECRET_KEY` — your `sb_secret_...` key
+- `TCGAPIS_API_KEY` — your TCGAPIs key
+
+That's it. The workflows run automatically once pushed. You can also trigger
+either one by hand from the repo's **Actions** tab (Run workflow).
+
+> The `/api/cron/*` HTTP endpoints still exist (protected by `CRON_SECRET`) if
+> you ever prefer Vercel Pro cron or an external curl scheduler, but they're not
+> used by default. Vercel cron is intentionally disabled in `vercel.json`.
+
+### Health check
+
+```bash
+npx tsx scripts/status.ts
+```
+
+Shows cycle state, priced-asset counts, order tallies, player counts, and value-history coverage — the fastest way to confirm the cron is advancing cycles.
 
 ## How a trade cycle works
 

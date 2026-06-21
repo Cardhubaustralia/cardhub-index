@@ -1,6 +1,4 @@
 {
-  "crons": [
-    { "path": "/api/cron/tick", "schedule": "* * * * *" },
-    { "path": "/api/cron/sync-catalog", "schedule": "30 17 * * *" }
-  ]
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs"
 }
