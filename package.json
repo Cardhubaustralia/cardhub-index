@@ -9,7 +9,9 @@
     "lint": "next lint",
     "sync:catalog": "tsx scripts/sync-catalog.ts",
     "sync:prices": "tsx scripts/sync-prices.ts",
-    "cycle:tick": "tsx scripts/cycle-tick.ts"
+    "cycle:tick": "tsx scripts/cycle-tick.ts",
+    "backfill": "tsx scripts/backfill-history.ts",
+    "status": "tsx scripts/status.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.6.1",

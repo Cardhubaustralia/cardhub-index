@@ -24,10 +24,39 @@ async function main() {
   console.log(line);
 
   const now = Date.now();
-  const next = (cycles ?? []).find((c) => new Date(c.executes_at).getTime() > now);
-  if (next) {
-    const mins = Math.round((new Date(next.executes_at).getTime() - now) / 60000);
-    console.log(`Next execution: cycle #${next.id} in ${mins} min (status ${next.status})`);
+  const fmtIn = (iso: string) => {
+    const mins = Math.round((new Date(iso).getTime() - now) / 60000);
+    if (mins < 0) return `${-mins} min ago`;
+    const h = Math.floor(mins / 60);
+    return h > 0 ? `${h}h ${mins % 60}m` : `${mins}m`;
+  };
+
+  // open window right now (orders accepted)
+  const { data: openCycle } = await db
+    .from("trade_cycles")
+    .select("id, opens_at, locks_at, executes_at")
+    .in("status", ["scheduled", "open"])
+    .lte("opens_at", new Date().toISOString())
+    .gt("locks_at", new Date().toISOString())
+    .order("executes_at")
+    .limit(1)
+    .maybeSingle();
+  if (openCycle) {
+    console.log(`Trading OPEN: cycle #${openCycle.id} — locks in ${fmtIn(openCycle.locks_at)}, executes in ${fmtIn(openCycle.executes_at)}`);
+  } else {
+    console.log("Trading currently CLOSED (between windows or pre-open)");
+  }
+
+  // nearest future execution (earliest, not latest)
+  const { data: nextExec } = await db
+    .from("trade_cycles")
+    .select("id, status, executes_at")
+    .gt("executes_at", new Date().toISOString())
+    .order("executes_at")
+    .limit(1)
+    .maybeSingle();
+  if (nextExec) {
+    console.log(`Next execution: cycle #${nextExec.id} in ${fmtIn(nextExec.executes_at)} (status ${nextExec.status})`);
   } else {
     console.log("⚠ No future cycle scheduled — run `npm run cycle:tick`");
   }
@@ -39,8 +68,25 @@ async function main() {
       .eq("cards.category_id", g.id).not("price", "is", null);
     console.log(`${g.n}: ${priced ?? 0} priced assets`);
   }
-  const { data: snapCount } = await db.rpc("count_snapshots").maybeSingle?.() ?? { data: null };
-  void snapCount;
+  console.log("\n=== MARKET INDEX (needs migration 0005) ===");
+  {
+    const { count, error } = await db
+      .from("market_index_snapshots")
+      .select("category_id", { count: "exact", head: true });
+    if (error) console.log(`⚠ ${error.message} — run migration 0005_market_index.sql`);
+    else {
+      console.log(`${count ?? 0} index snapshots recorded`);
+      const { data: stats } = await db.from("v_market_stats").select("display_name, index_value, card_count");
+      for (const s of stats ?? [])
+        console.log(`  ${s.display_name}: $${Number(s.index_value ?? 0).toLocaleString()} (${s.card_count ?? 0} cards)`);
+    }
+  }
+
+  console.log("\n=== REALIZED P&L (needs migration 0006) ===");
+  {
+    const { error } = await db.from("orders").select("realized_pnl").limit(1);
+    console.log(error ? `⚠ ${error.message} — run migration 0006_realized_pnl.sql` : "orders.realized_pnl column present ✓");
+  }
 
   console.log("\n=== ORDERS ===");
   for (const s of ["pending", "filled", "rejected", "cancelled"]) {
@@ -57,7 +103,7 @@ async function main() {
   const { count: hist } = await db.from("portfolio_history").select("portfolio_id", { count: "exact", head: true });
   console.log(`${hist ?? 0} value snapshots recorded`);
   console.log(line);
-  console.log("If cycles aren't advancing on their own, Vercel cron isn't firing —");
-  console.log("see README 'Cron' section (Hobby plan = daily only).");
+  console.log("If cycles aren't advancing on their own, check the 'Trade cycle tick'");
+  console.log("workflow in the repo's GitHub Actions tab.");
 }
 main().catch((e) => { console.error(e); process.exit(1); });

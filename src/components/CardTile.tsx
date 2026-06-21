@@ -7,6 +7,7 @@ export interface MarketRow {
   variant: string;
   price: number | null;
   change_pct: number | null;
+  change_7d_pct?: number | null;
   name: string;
   number: string | null;
   rarity: string | null;
@@ -42,9 +43,10 @@ export default function CardTile({ row }: { row: MarketRow }) {
       </div>
       <div className="text-right">
         <p className="font-black">{usd(row.price)}</p>
-        <p className={`text-xs font-extrabold ${pctClass(row.change_pct)}`}>
-          {pct(row.change_pct)}
-        </p>
+        {(() => {
+          const chg = row.change_pct ?? row.change_7d_pct ?? null;
+          return <p className={`text-xs font-extrabold ${pctClass(chg)}`}>{pct(chg)}</p>;
+        })()}
       </div>
     </Link>
   );

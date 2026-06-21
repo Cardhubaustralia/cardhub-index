@@ -55,6 +55,16 @@ export default async function CardPage({
     t: s.captured_at as string,
     price: Number(s.price),
   }));
+  // always end the series on the current cycle price
+  if (active.price != null) {
+    const today = new Date().toISOString().slice(0, 10);
+    const last = chartData[chartData.length - 1];
+    if (!last || last.t.slice(0, 10) !== today) {
+      chartData.push({ t: new Date().toISOString(), price: Number(active.price) });
+    } else {
+      last.price = Number(active.price);
+    }
+  }
 
   const {
     data: { user },

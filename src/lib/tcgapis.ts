@@ -97,11 +97,28 @@ export async function fetchCardmarketPrice(idProduct: number) {
   return json.data;
 }
 
-// Historic prices for one product (card-detail backfill, optional)
-export async function fetchHistoricPrices(productId: number) {
-  return getJson<{ success: boolean; data: unknown }>(
-    `/api/v2/historic-prices/${productId}`
-  );
+// Historic prices for one product. Shape (verified live 2026-06-13):
+//   data.prices = { "YYYY-MM-DD": { "<variant>": { highPrice, lowPrice, midPrice } } }
+export interface HistoricPrices {
+  success: boolean;
+  data: {
+    productId: number;
+    createdAt?: string;
+    prices: Record<string, Record<string, {
+      highPrice: number | null;
+      lowPrice: number | null;
+      midPrice: number | null;
+    }>>;
+  };
+}
+export async function fetchHistoricPrices(productId: number): Promise<HistoricPrices | null> {
+  const res = await fetch(`${BASE}/api/v2/historic-prices/${productId}`, {
+    headers: headers(),
+    cache: "no-store",
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`historic-prices ${productId} -> ${res.status}`);
+  return res.json() as Promise<HistoricPrices>;
 }
 
 // ---------------- CSV parsing ----------------
