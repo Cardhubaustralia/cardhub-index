@@ -75,11 +75,13 @@ export default async function MarketOverview() {
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-xs font-bold uppercase tracking-wide text-slate-400">
-              <th className="px-5 py-3">TCG</th>
+              <th className="px-5 py-3 w-10">#</th>
+              <th className="px-3 py-3">TCG</th>
               <th className="px-3 py-3 text-right">Market index</th>
               <th className="px-3 py-3 text-right">7d</th>
               <th className="px-3 py-3 text-right hidden sm:table-cell">30d</th>
               <th className="px-3 py-3 text-right hidden sm:table-cell">90d</th>
+              <th className="px-3 py-3 text-right hidden md:table-cell">Dominance</th>
               <th className="px-3 py-3 text-right">Cards</th>
               <th className="px-5 py-3 text-right">Trend</th>
             </tr>
@@ -89,13 +91,18 @@ export default async function MarketOverview() {
               const c7 = change(r.index_value, r.index_7d);
               const c30 = change(r.index_value, r.index_30d);
               const c90 = change(r.index_value, r.index_90d);
+              const dominance = total > 0 ? (Number(r.index_value ?? 0) / total) * 100 : 0;
               return (
                 <tr key={r.category_id} className="border-t border-slate-100 font-bold">
-                  <td className="px-5 py-3">{r.display_name}</td>
+                  <td className="px-5 py-3 text-slate-400">{i + 1}</td>
+                  <td className="px-3 py-3">{r.display_name}</td>
                   <td className="px-3 py-3 text-right font-black">{usd(r.index_value)}</td>
                   <td className={`px-3 py-3 text-right ${pctClass(c7)}`}>{pct(c7)}</td>
                   <td className={`px-3 py-3 text-right hidden sm:table-cell ${pctClass(c30)}`}>{pct(c30)}</td>
                   <td className={`px-3 py-3 text-right hidden sm:table-cell ${pctClass(c90)}`}>{pct(c90)}</td>
+                  <td className="px-3 py-3 text-right hidden md:table-cell text-slate-500">
+                    {dominance.toFixed(1)}%
+                  </td>
                   <td className="px-3 py-3 text-right text-slate-500">
                     {Number(r.card_count ?? 0).toLocaleString()}
                   </td>

@@ -58,6 +58,16 @@ export async function joinLeague(code: string): Promise<ActionResult> {
   return { ok: true, message: "Joined league!" };
 }
 
+export async function markOnboarded(): Promise<ActionResult> {
+  const supabase = await serverClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: "Not signed in" };
+  const { error } = await supabase
+    .from("profiles").update({ onboarded: true }).eq("user_id", user.id);
+  if (error) return { ok: false, message: error.message };
+  return { ok: true, message: "" };
+}
+
 export async function updateProfile(formData: FormData): Promise<ActionResult> {
   const supabase = await serverClient();
   const { data: { user } } = await supabase.auth.getUser();

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { serverClient } from "@/lib/supabase/server";
 import RangeChart from "@/components/RangeChart";
 import TradePanel from "@/components/TradePanel";
+import OrderFlow from "@/components/OrderFlow";
 import { usd, pct, pctClass } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -130,6 +131,7 @@ export default async function CardPage({
             signedIn={!!user}
             tradingOpen={tradingOpen}
           />
+          <OrderFlow assetId={active.id} />
         </div>
 
         <div className="space-y-6">

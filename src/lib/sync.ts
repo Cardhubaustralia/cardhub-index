@@ -1,9 +1,19 @@
 // Catalog + price sync engine. Server-only (service role).
 import { SupabaseClient } from "@supabase/supabase-js";
 import {
-  fetchExpansions, fetchCards, fetchPricesCsv, fetchCardmarketPrice,
-  parseCsv, pick, COL,
+  fetchExpansions, fetchCards, fetchProductPrices, fetchCardmarketPrice,
 } from "./tcgapis";
+
+// Global rate limiter: space API calls ~35ms apart (~1700/min, under the
+// 2000/min ceiling) regardless of concurrency.
+let _nextSlot = 0;
+const _sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+async function rateSlot() {
+  const now = Date.now();
+  const wait = Math.max(0, _nextSlot - now);
+  _nextSlot = Math.max(now, _nextSlot) + 35;
+  if (wait) await _sleep(wait);
+}
 
 export const GAMES = [
   { categoryId: 3, slug: "pokemon", name: "Pokemon", displayName: "Pokémon" },
@@ -88,15 +98,13 @@ export async function fetchEurUsd(): Promise<number> {
 }
 
 // ------------------------------------------------------------
-// PRICE SYNC — whole-game CSV per game (1 request), upsert assets,
-// snapshot to price_snapshots for the given cycle.
+// PRICE SYNC — per-product /api/v2/prices/{id}, keyed by variant.
+// Unambiguous (no same-name collisions). One call per product,
+// globally rate-limited. Designed to run in a long worker (GH Actions).
 // ------------------------------------------------------------
 export interface PriceSyncResult { game: string; assets: number; skipped: number }
 
-// The prices CSV has no productId column, so we match each row back to
-// the catalog by (set name, product name) — both sides originate from
-// TCGPlayer product names, so exact (case-insensitive) matching is solid.
-const norm = (s: string) => s.trim().toLowerCase();
+const SYNC_CONCURRENCY = 10;
 
 export async function syncPricesForGame(
   db: SupabaseClient,
@@ -105,42 +113,29 @@ export async function syncPricesForGame(
   eurUsd: number,
   log: (m: string) => void = console.log
 ): Promise<PriceSyncResult> {
-  // 1. sets for this game
-  const { data: sets, error: setsErr } = await db
-    .from("sets")
-    .select("group_id, name")
-    .eq("category_id", game.categoryId);
-  if (setsErr) throw new Error(setsErr.message);
-
-  // 2. card name -> productId map (paged: Supabase caps requests at 1000 rows)
-  const cardMap = new Map<string, number>();
-  let dupNames = 0;
+  // 1. all catalogued products for this game (paged; 1000-row cap).
+  //    Price every variant the API returns so new cards/variants get
+  //    asset rows created automatically (upsert_asset_prices joins cards).
+  const productIds: number[] = [];
   {
     let from = 0;
     const page = 1000;
     for (;;) {
       const { data, error } = await db
         .from("cards")
-        .select("product_id, group_id, name")
+        .select("product_id")
         .eq("category_id", game.categoryId)
         .order("product_id")
         .range(from, from + page - 1);
       if (error) throw new Error(error.message);
-      for (const r of data ?? []) {
-        const key = `${r.group_id}::${norm(r.name)}`;
-        if (cardMap.has(key)) dupNames++;
-        else cardMap.set(key, Number(r.product_id));
-      }
+      for (const r of data ?? []) productIds.push(Number(r.product_id));
       if (!data || data.length < page) break;
       from += page;
     }
   }
-  log(`${game.slug}: ${cardMap.size} catalogued products (${dupNames} duplicate names ignored)`);
+  log(`${game.slug}: ${productIds.length} products to price`);
 
-  const setByName = new Map<string, number>();
-  (sets ?? []).forEach((s) => setByName.set(norm(s.name), s.group_id));
-
-  // 3. Cardmarket overlay for the blend
+  // 2. Cardmarket overlay for the blend
   const { data: cmRows } = await db
     .from("assets")
     .select("product_id, variant, cardmarket_eur")
@@ -155,62 +150,74 @@ export async function syncPricesForGame(
     tcgplayer_price: number; cardmarket_eur: number | null; price_source: string;
     price_updated_at: string;
   };
-  const assets = new Map<string, AssetRow>(); // dedupe on (productId, variant)
-  let skippedUnknown = 0;
-  let skippedNoPrice = 0;
-  let failedSets = 0;
   const now = new Date().toISOString();
+  let pending: AssetRow[] = [];
+  let upserted = 0;
+  let processed = 0;
+  let noPrice = 0;
 
-  // 4. one CSV per expansion (the whole-game CSV is capped at ~7000 rows)
-  for (const set of sets ?? []) {
-    let rows: Record<string, string>[];
-    try {
-      rows = parseCsv(await fetchPricesCsv(game.name, set.name));
-    } catch (e) {
-      failedSets++;
-      log(`${game.slug} / ${set.name}: CSV failed (${e}) — skipping set`);
-      continue;
-    }
-    for (const row of rows) {
-      const setName = norm(pick(row, COL.set));
-      const groupId = setByName.get(setName) ?? set.group_id;
-      const pid = cardMap.get(`${groupId}::${norm(pick(row, COL.name))}`);
-      if (!pid) { skippedUnknown++; continue; }
-      const tcg = parseFloat(
-        pick(row, COL.marketPrice) || pick(row, COL.price) || pick(row, COL.lowPrice)
-      );
-      if (!tcg || tcg <= 0) { skippedNoPrice++; continue; }
-      const variant = pick(row, COL.variant) || "Normal";
-      const cmEur = cmMap.get(`${pid}:${variant}`) ?? null;
-      const cmUsd = cmEur ? cmEur * eurUsd : null;
-      const price = cmUsd ? (tcg + cmUsd) / 2 : tcg;
-      assets.set(`${pid}:${variant}`, {
-        product_id: pid,
-        variant,
-        price: Math.round(price * 100) / 100,
-        tcgplayer_price: tcg,
-        cardmarket_eur: cmEur,
-        price_source: cmUsd ? "blend" : "tcgplayer",
-        price_updated_at: now,
-      });
-    }
-  }
-
-  // 5. upsert: rolls price -> prev_price + snapshots, via RPC
-  const rows = [...assets.values()];
-  for (const batch of chunk(rows, 1000)) {
-    const { error } = await db.rpc("upsert_asset_prices", {
-      p_rows: batch,
-      p_cycle_id: cycleId,
-    });
+  const flush = async () => {
+    if (!pending.length) return;
+    const batch = pending;
+    pending = [];
+    const { error } = await db.rpc("upsert_asset_prices", { p_rows: batch, p_cycle_id: cycleId });
     if (error) throw new Error(`upsert_asset_prices: ${error.message}`);
-  }
+    upserted += batch.length;
+  };
 
-  log(
-    `${game.slug}: upserted ${rows.length} assets ` +
-    `(${skippedUnknown} rows unmatched, ${skippedNoPrice} no price, ${failedSets} sets failed)`
-  );
-  return { game: game.slug, assets: rows.length, skipped: skippedUnknown + skippedNoPrice };
+  const buckets: number[][] = Array.from({ length: SYNC_CONCURRENCY }, () => []);
+  productIds.forEach((pid, i) => buckets[i % SYNC_CONCURRENCY].push(pid));
+
+  const worker = async (list: number[]) => {
+    for (const pid of list) {
+      // retry transient network failures (e.g. laptop sleep / wifi blip)
+      let pr: Awaited<ReturnType<typeof fetchProductPrices>> = null;
+      let lastErr: unknown = null;
+      for (let attempt = 0; attempt < 4; attempt++) {
+        await rateSlot();
+        try {
+          pr = await fetchProductPrices(pid);
+          lastErr = null;
+          break;
+        } catch (e) {
+          lastErr = e;
+          await _sleep(500 * (attempt + 1)); // 0.5s, 1s, 1.5s backoff
+        }
+      }
+      if (lastErr) { log(`${game.slug} product ${pid}: ${lastErr} (gave up)`); processed++; continue; }
+      try {
+        if (pr?.data?.prices) {
+          for (const [v, p] of Object.entries(pr.data.prices)) {
+            const tcg = p?.marketPrice ?? p?.midPrice ?? null;
+            if (!tcg || tcg <= 0) { noPrice++; continue; }
+            const cmEur = cmMap.get(`${pid}:${v}`) ?? null;
+            const cmUsd = cmEur ? cmEur * eurUsd : null;
+            const price = cmUsd ? (tcg + cmUsd) / 2 : tcg;
+            pending.push({
+              product_id: pid, variant: v,
+              price: Math.round(price * 100) / 100,
+              tcgplayer_price: tcg,
+              cardmarket_eur: cmEur,
+              price_source: cmUsd ? "blend" : "tcgplayer",
+              price_updated_at: now,
+            });
+          }
+        }
+      } catch (e) {
+        log(`${game.slug} product ${pid}: ${e}`);
+      }
+      processed++;
+      if (pending.length >= 1000) await flush();
+      if (processed % 2000 === 0)
+        log(`  ${game.slug}: ${processed}/${productIds.length} products · ${upserted} prices`);
+    }
+  };
+
+  await Promise.all(buckets.map(worker));
+  await flush();
+
+  log(`${game.slug}: upserted ${upserted} prices (${noPrice} variants had no price)`);
+  return { game: game.slug, assets: upserted, skipped: noPrice };
 }
 
 // Refresh Cardmarket EUR prices for the most actively traded assets

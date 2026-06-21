@@ -82,6 +82,28 @@ export async function fetchPricesCsv(
   return res.text();
 }
 
+// Per-product current prices, keyed by variant — UNAMBIGUOUS (unlike the
+// per-set CSV which has no productId and collides on same-name cards).
+// Shape: data.prices = { "<variant>": { lowPrice, midPrice, highPrice, marketPrice, directLowPrice } }
+export interface ProductPrices {
+  success: boolean;
+  data: {
+    productId: number;
+    prices: Record<string, {
+      lowPrice: number | null; midPrice: number | null; highPrice: number | null;
+      marketPrice: number | null; directLowPrice: number | null;
+    }>;
+  };
+}
+export async function fetchProductPrices(productId: number): Promise<ProductPrices | null> {
+  const res = await fetch(`${BASE}/api/v2/prices/${productId}`, {
+    headers: headers(), cache: "no-store",
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`prices ${productId} -> ${res.status}`);
+  return res.json() as Promise<ProductPrices>;
+}
+
 // Cardmarket price guide for a single product (used for the blended
 // overlay on actively-traded cards only).
 export interface CardmarketPrice {

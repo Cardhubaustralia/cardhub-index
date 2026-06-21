@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import CountdownBar from "@/components/CountdownBar";
+import OnboardingModal from "@/components/OnboardingModal";
 import { serverClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
@@ -21,13 +22,15 @@ export default async function RootLayout({
   } = await supabase.auth.getUser();
 
   let username: string | null = null;
+  let needsOnboarding = false;
   if (user) {
     const { data } = await supabase
       .from("profiles")
-      .select("username")
+      .select("username, onboarded")
       .eq("user_id", user.id)
       .single();
     username = data?.username ?? null;
+    needsOnboarding = data ? !data.onboarded : false;
   }
 
   const { data: cycle } = await supabase
@@ -68,6 +71,7 @@ export default async function RootLayout({
           />
         )}
         <main className="mx-auto max-w-6xl px-4 pb-16 pt-6">{children}</main>
+        {needsOnboarding && <OnboardingModal />}
       </body>
     </html>
   );
