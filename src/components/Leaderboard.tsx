@@ -30,8 +30,8 @@ export default function Leaderboard({
     );
   }
   return (
-    <section className="panel overflow-hidden">
-      <table className="w-full text-sm">
+    <section className="panel overflow-x-auto">
+      <table className="w-full min-w-[420px] text-sm">
         <thead>
           <tr className="text-left text-xs font-bold uppercase tracking-wide text-slate-400">
             <th className="px-5 py-3 w-14">#</th>

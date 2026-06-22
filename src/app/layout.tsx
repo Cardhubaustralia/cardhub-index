@@ -3,6 +3,7 @@ import "./globals.css";
 import Navbar from "@/components/Navbar";
 import CountdownBar from "@/components/CountdownBar";
 import OnboardingModal from "@/components/OnboardingModal";
+import MobileNav from "@/components/MobileNav";
 import { serverClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
@@ -70,7 +71,8 @@ export default async function RootLayout({
             executesAt={nextCycle.executes_at}
           />
         )}
-        <main className="mx-auto max-w-6xl px-4 pb-16 pt-6">{children}</main>
+        <main className="mx-auto max-w-6xl px-4 pb-24 pt-6 sm:pb-16">{children}</main>
+        <MobileNav signedIn={!!user} />
         {needsOnboarding && <OnboardingModal />}
       </body>
     </html>

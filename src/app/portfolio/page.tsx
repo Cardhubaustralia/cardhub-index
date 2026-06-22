@@ -135,14 +135,14 @@ export default async function PortfolioPage({
         </section>
       )}
 
-      <section className="panel overflow-hidden">
+      <section className="panel overflow-x-auto">
         <h2 className="px-5 pt-4 font-black">Holdings ({rows.length})</h2>
         {!rows.length ? (
           <p className="px-5 pb-6 pt-2 font-bold text-slate-400">
             Nothing yet — <Link className="text-blue-600 underline" href="/market">go buy some cards</Link>.
           </p>
         ) : (
-          <table className="mt-2 w-full text-sm">
+          <table className="mt-2 w-full min-w-[520px] text-sm">
             <thead>
               <tr className="text-left text-xs font-bold uppercase tracking-wide text-slate-400">
                 <th className="px-5 py-2">Card</th>
@@ -185,7 +185,7 @@ export default async function PortfolioPage({
         )}
       </section>
 
-      <section className="panel overflow-hidden">
+      <section className="panel overflow-x-auto">
         <div className="flex items-center justify-between px-5 pt-4">
           <h2 className="font-black">Recent orders</h2>
           <span className="flex items-center gap-3">
@@ -203,7 +203,7 @@ export default async function PortfolioPage({
         {!orders?.length ? (
           <p className="px-5 pb-6 pt-2 font-bold text-slate-400">No orders yet.</p>
         ) : (
-          <table className="mt-2 w-full text-sm">
+          <table className="mt-2 w-full min-w-[520px] text-sm">
             <thead>
               <tr className="text-left text-xs font-bold uppercase tracking-wide text-slate-400">
                 <th className="px-5 py-2">Card</th>

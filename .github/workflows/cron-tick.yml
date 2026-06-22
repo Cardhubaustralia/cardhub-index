@@ -1,12 +1,9 @@
-name: Trade cycle tick
+name: Price sync (manual fallback)
 
-# Advances the trade-cycle state machine: opens/locks/executes cycles and
-# runs the price sync at each lockout. Runs the real Node script on the
-# runner, so the multi-minute price sync has no serverless timeout.
+# Price sync now runs in Supabase (pg_cron -> sync-prices Edge Function).
+# This workflow is kept only as a manual fallback / one-off full resync.
 on:
-  schedule:
-    - cron: "*/5 * * * *" # every 5 minutes (GitHub's minimum interval)
-  workflow_dispatch: {} # lets you run it manually from the Actions tab
+  workflow_dispatch: {}
 
 # Never let two ticks run at once (a long lockout sync + the next tick).
 concurrency:

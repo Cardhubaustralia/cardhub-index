@@ -45,7 +45,38 @@ npm run sync:prices    # full price snapshot from the whole-game CSVs
 npm run dev
 ```
 
-### 5. Production cron — GitHub Actions (chosen method)
+### 5. Scheduling (reliable, all in Supabase)
+
+**Execution** runs in-database via **pg_cron** calling `run_tick()` every minute
+(migration `0019`) — state transitions + trade execution, pure SQL, no external
+dependency. Execution is decoupled from the price sync (migration `0018`), so
+trades always fill on time at the most recent prices even if a sync is late.
+
+**Price sync** runs as a chunked **Supabase Edge Function** (`sync-prices`),
+pinged every minute by pg_cron via pg_net (migration `0020`). Each invocation
+prices ~2,500 cards and advances a cursor until the cycle is fully synced.
+
+Deploy the Edge Function (needs the Supabase CLI — `npx supabase`):
+
+```bash
+npx supabase login
+npx supabase link --project-ref lqwmsrwoyoalcuzxkzsu
+npx supabase secrets set TCGAPIS_API_KEY=<key> CRON_SECRET=<random-string>
+npx supabase functions deploy sync-prices --no-verify-jwt
+```
+
+Then run migrations `0018`–`0020`, and set the shared secret so pg_cron can call
+the function (must equal the `CRON_SECRET` above):
+
+```sql
+update public.app_config set value = '<same-random-string>' where key = 'cron_secret';
+```
+
+`edge_url` is pre-filled for this project. That's it — everything runs in
+Supabase. The GitHub "Price sync (manual fallback)" workflow remains for one-off
+full resyncs from your machine / the Actions tab.
+
+### (legacy) GitHub Actions
 
 Scheduling runs on **GitHub Actions**, not Vercel — the workflow runs the real
 Node script on the runner, so the multi-minute price sync has no serverless

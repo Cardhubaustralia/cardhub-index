@@ -14,7 +14,9 @@ export async function GET(req: NextRequest) {
   }
   const logs: string[] = [];
   try {
-    const result = await tick(adminClient(), (m) => logs.push(m));
+    // light tick: state transitions + execution only (no heavy price sync),
+    // so this endpoint stays fast and safe to call every minute.
+    const result = await tick(adminClient(), { sync: false }, (m) => logs.push(m));
     return NextResponse.json({ ok: true, result, logs });
   } catch (e) {
     return NextResponse.json(

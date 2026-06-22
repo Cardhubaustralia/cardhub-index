@@ -1,10 +1,9 @@
 import Link from "next/link";
 import { serverClient } from "@/lib/supabase/server";
-import CreateGameForm, { SetLite } from "@/components/CreateGameForm";
 import JoinGame from "@/components/JoinGame";
 import GameCountdown from "@/components/GameCountdown";
 import { universeLabel } from "@/lib/universe";
-import { Users, Globe } from "lucide-react";
+import { Users, Globe, Plus } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -48,10 +47,16 @@ export default async function GamesPage() {
   const { data: { user } } = await supabase.auth.getUser();
 
   const mineIds = new Set<string>();
+  let role = "user";
   if (user) {
-    const { data } = await supabase.from("league_members").select("league_id").eq("user_id", user.id);
-    (data ?? []).forEach((r) => mineIds.add(r.league_id));
+    const [{ data: mem }, { data: prof }] = await Promise.all([
+      supabase.from("league_members").select("league_id").eq("user_id", user.id),
+      supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle(),
+    ]);
+    (mem ?? []).forEach((r) => mineIds.add(r.league_id));
+    role = prof?.role ?? "user";
   }
+  const canCreate = role === "lead" || role === "admin";
 
   const { data: games } = await supabase
     .from("v_games").select("*")
@@ -62,13 +67,16 @@ export default async function GamesPage() {
   const mine = all.filter((g) => mineIds.has(g.id));
   const open = all.filter((g) => !mineIds.has(g.id) && g.join_policy === "open" && g.game_status !== "ended");
 
-  const { data: setData } = await supabase
-    .from("v_sets").select("slug, name, group_id, game_slug").order("name");
-  const sets = (setData ?? []) as SetLite[];
-
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-black">Games</h1>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-2xl font-black">Games</h1>
+        {canCreate && (
+          <Link href="/leagues/create" className="btn-primary text-sm">
+            <Plus size={16} /> Create game
+          </Link>
+        )}
+      </div>
 
       <section className="space-y-3">
         <h2 className="flex items-center gap-2 font-black text-slate-600"><Users size={18} /> Your games</h2>
@@ -83,12 +91,7 @@ export default async function GamesPage() {
         )}
       </section>
 
-      {user && (
-        <section className="grid gap-4 lg:grid-cols-2">
-          <CreateGameForm sets={sets} />
-          <JoinGame />
-        </section>
-      )}
+      {user && <div className="max-w-md"><JoinGame /></div>}
 
       {open.length > 0 && (
         <section className="space-y-3">

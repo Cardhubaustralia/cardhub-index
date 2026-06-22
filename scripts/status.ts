@@ -61,6 +61,22 @@ async function main() {
     console.log("⚠ No future cycle scheduled — run `npm run cycle:tick`");
   }
 
+  console.log("\n=== FRESHNESS (is the cron actually running?) ===");
+  {
+    const { data: lastPrice } = await db
+      .from("assets").select("price_updated_at")
+      .order("price_updated_at", { ascending: false, nullsFirst: false }).limit(1).maybeSingle();
+    const { data: lastExec } = await db
+      .from("trade_cycles").select("id, executed_at")
+      .eq("status", "executed").order("executed_at", { ascending: false, nullsFirst: false })
+      .limit(1).maybeSingle();
+    const since = (iso?: string | null) =>
+      iso ? `${Math.round((Date.now() - new Date(iso).getTime()) / 3600000)}h ago` : "never";
+    console.log(`Last price update:   ${since(lastPrice?.price_updated_at)}`);
+    console.log(`Last cycle executed: ${lastExec ? `#${lastExec.id}, ${since(lastExec.executed_at)}` : "never"}`);
+    console.log("(If these are 'never' or many hours/days old, the GitHub Actions cron isn't firing.)");
+  }
+
   console.log("\n=== PRICES ===");
   for (const g of [{ id: 3, n: "pokemon" }, { id: 68, n: "one-piece" }]) {
     const { count: priced } = await db
