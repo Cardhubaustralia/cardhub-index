@@ -106,5 +106,11 @@ export async function tick(
     }
   }
 
+  // 5. rank-change notifications (after values moved)
+  if (result.executed.length) {
+    const { error } = await db.rpc("notify_ranks");
+    if (error) log(`notify_ranks: ${error.message}`);
+  }
+
   return result;
 }

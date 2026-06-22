@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { serverClient } from "@/lib/supabase/server";
 import { usd, pctClass } from "@/lib/format";
-import { History, Eye, Settings, Bell, Users } from "lucide-react";
+import { History, Eye, Settings, Bell, Users, ShoppingCart } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -63,6 +63,7 @@ export default async function ProfilePage() {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
+        {tile("/checkout", ShoppingCart, "Pending trades", "Orders waiting to execute")}
         {tile("/portfolio/history", History, "Trade history", "Every order you've placed")}
         {tile("/profile/watchlist", Eye, "Watchlist", "Cards you're keeping an eye on")}
         {tile("/notifications", Bell, "Notifications", "Trade fills & game updates")}
