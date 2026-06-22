@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { TrendingUp, Trophy, Users, Briefcase, Settings, LogIn } from "lucide-react";
 import GlobalSearch from "@/components/GlobalSearch";
+import NotificationBell from "@/components/NotificationBell";
 
 export default function Navbar({ username }: { username: string | null }) {
   return (
@@ -30,8 +31,9 @@ export default function Navbar({ username }: { username: string | null }) {
         </nav>
         <div className="ml-auto flex items-center gap-2">
           <GlobalSearch />
+          {username && <NotificationBell />}
           {username ? (
-            <Link href="/settings" className="btn-ghost text-sm">
+            <Link href="/profile" className="btn-ghost text-sm">
               <Settings size={15} /> {username}
             </Link>
           ) : (

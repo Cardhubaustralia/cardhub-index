@@ -85,6 +85,34 @@ export async function markOnboarded(): Promise<ActionResult> {
   return { ok: true, message: "" };
 }
 
+export async function toggleWatch(assetId: number, watching: boolean): Promise<ActionResult> {
+  const supabase = await serverClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: "Not signed in" };
+  if (watching) {
+    const { error } = await supabase.from("watchlist").delete()
+      .eq("user_id", user.id).eq("asset_id", assetId);
+    if (error) return { ok: false, message: error.message };
+    return { ok: true, message: "Removed from watchlist" };
+  }
+  const { error } = await supabase.from("watchlist")
+    .insert({ user_id: user.id, asset_id: assetId });
+  if (error) return { ok: false, message: error.message };
+  return { ok: true, message: "Added to watchlist" };
+}
+
+export async function markNotificationsRead(ids?: number[]): Promise<ActionResult> {
+  const supabase = await serverClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: "Not signed in" };
+  let q = supabase.from("notifications").update({ read: true }).eq("user_id", user.id);
+  if (ids?.length) q = q.in("id", ids);
+  else q = q.eq("read", false);
+  const { error } = await q;
+  if (error) return { ok: false, message: error.message };
+  return { ok: true, message: "" };
+}
+
 export async function updateProfile(formData: FormData): Promise<ActionResult> {
   const supabase = await serverClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -95,6 +123,8 @@ export async function updateProfile(formData: FormData): Promise<ActionResult> {
       username: String(formData.get("username") ?? ""),
       display_name: String(formData.get("display_name") ?? ""),
       country: String(formData.get("country") ?? "") || null,
+      notify_trades: formData.get("notify_trades") === "on",
+      notify_general: formData.get("notify_general") === "on",
     })
     .eq("user_id", user.id);
   if (error) return { ok: false, message: error.message };

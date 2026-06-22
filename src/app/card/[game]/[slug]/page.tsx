@@ -5,6 +5,7 @@ import { serverClient } from "@/lib/supabase/server";
 import RangeChart from "@/components/RangeChart";
 import TradePanel, { LeagueCtx } from "@/components/TradePanel";
 import OrderFlow from "@/components/OrderFlow";
+import WatchButton from "@/components/WatchButton";
 import { usd, pct, pctClass } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -118,6 +119,13 @@ export default async function CardPage({
   const { data: cycle } = await supabase.rpc("current_open_cycle").maybeSingle();
   const tradingOpen = !!cycle;
 
+  let watching = false;
+  if (user) {
+    const { data: w } = await supabase
+      .from("watchlist").select("asset_id").eq("user_id", user.id).eq("asset_id", active.id).maybeSingle();
+    watching = !!w;
+  }
+
   const set = card.sets as unknown as { name: string; slug: string };
 
   const stat = (label: string, value: string, cls = "") => (
@@ -170,12 +178,15 @@ export default async function CardPage({
 
         <div className="space-y-6">
           <div>
-            <h1 className="text-3xl font-black leading-tight">
-              {card.name}
-              {card.number ? (
-                <span className="text-slate-400"> · #{card.number}</span>
-              ) : null}
-            </h1>
+            <div className="flex items-start justify-between gap-3">
+              <h1 className="text-3xl font-black leading-tight">
+                {card.name}
+                {card.number ? (
+                  <span className="text-slate-400"> · #{card.number}</span>
+                ) : null}
+              </h1>
+              <WatchButton assetId={active.id} initialWatching={watching} signedIn={!!user} />
+            </div>
             <p className="font-bold text-slate-500">
               {set?.name}
               {card.rarity ? ` · ${card.rarity}` : ""} · {active.variant}

@@ -26,3 +26,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: https://lqwmsrwoyoalcuzxkzsu.supabase.co
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           TCGAPIS_API_KEY: ${{ secrets.TCGAPIS_API_KEY }}
+      - run: npm run notify:daily
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://lqwmsrwoyoalcuzxkzsu.supabase.co
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}

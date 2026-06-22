@@ -13,7 +13,7 @@ export default async function SettingsPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("username, display_name, country")
+    .select("username, display_name, country, notify_trades, notify_general")
     .eq("user_id", user.id)
     .single();
 
@@ -25,6 +25,8 @@ export default async function SettingsPage() {
         username={profile?.username ?? ""}
         displayName={profile?.display_name ?? ""}
         country={profile?.country ?? ""}
+        notifyTrades={profile?.notify_trades ?? true}
+        notifyGeneral={profile?.notify_general ?? true}
       />
     </div>
   );

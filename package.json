@@ -10,6 +10,7 @@
     "sync:catalog": "tsx scripts/sync-catalog.ts",
     "sync:prices": "tsx scripts/sync-prices.ts",
     "cycle:tick": "tsx scripts/cycle-tick.ts",
+    "notify:daily": "tsx scripts/notify-daily.ts",
     "backfill": "tsx scripts/backfill-history.ts",
     "backfill:index": "tsx scripts/backfill-index.ts",
     "recompute": "tsx scripts/recompute.ts",

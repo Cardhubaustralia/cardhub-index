@@ -9,11 +9,15 @@ export default function SettingsForm({
   username,
   displayName,
   country,
+  notifyTrades,
+  notifyGeneral,
 }: {
   email: string;
   username: string;
   displayName: string;
   country: string;
+  notifyTrades: boolean;
+  notifyGeneral: boolean;
 }) {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [pending, startTransition] = useTransition();
@@ -66,6 +70,18 @@ export default function SettingsForm({
           Country
           <input name="country" defaultValue={country} placeholder="AU" className="field mt-1" />
         </label>
+
+        <div className="space-y-2 rounded-2xl border-2 border-slate-200 p-4">
+          <p className="text-sm font-black">Notifications</p>
+          <label className="flex items-center justify-between text-sm font-bold text-slate-600">
+            Trade fills &amp; rejections
+            <input type="checkbox" name="notify_trades" defaultChecked={notifyTrades} className="h-4 w-4" />
+          </label>
+          <label className="flex items-center justify-between text-sm font-bold text-slate-600">
+            Game updates (days left, etc.)
+            <input type="checkbox" name="notify_general" defaultChecked={notifyGeneral} className="h-4 w-4" />
+          </label>
+        </div>
         {msg && (
           <p
             className={
