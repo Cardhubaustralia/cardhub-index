@@ -11,8 +11,7 @@ export default async function LeaderboardPage() {
   } = await supabase.auth.getUser();
 
   const { data: rows } = await supabase
-    .from("v_leaderboard")
-    .select("*")
+    .rpc("leaderboard")
     .eq("league_id", GLOBAL_LEAGUE)
     .order("rank")
     .limit(100);

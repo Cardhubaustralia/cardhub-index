@@ -79,7 +79,7 @@ export default async function CardPage({
         .from("portfolios")
         .select("id, cash, league_id, leagues(id, name, max_position_pct)")
         .eq("user_id", user.id),
-      supabase.from("v_leaderboard").select("league_id, value").eq("user_id", user.id),
+      supabase.rpc("leaderboard").eq("user_id", user.id),
       supabase
         .from("orders")
         .select("id, side, qty, est_price, league_id")
@@ -95,7 +95,9 @@ export default async function CardPage({
     ]);
     const eligibleIds = new Set((elig ?? []).map((r: { league_id: string }) => r.league_id));
     const holdByPort = new Map((holds ?? []).map((h) => [h.portfolio_id, h]));
-    const valueByLeague = new Map((lb ?? []).map((r) => [r.league_id, Number(r.value)]));
+    const valueByLeague = new Map(
+      ((lb ?? []) as { league_id: string; value: number }[]).map((r) => [r.league_id, Number(r.value)])
+    );
 
     leagues = (ports ?? []).map((p) => {
       const l = p.leagues as unknown as { id: string; name: string; max_position_pct: number };

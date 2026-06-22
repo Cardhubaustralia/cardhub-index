@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { serverClient } from "@/lib/supabase/server";
-import Leaderboard from "@/components/Leaderboard";
+import Leaderboard, { LeaderboardRow } from "@/components/Leaderboard";
 import JoinPublicButton from "@/components/JoinPublicButton";
 import GameCountdown from "@/components/GameCountdown";
 import { universeLabel } from "@/lib/universe";
@@ -25,9 +25,10 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
     isMember = !!data;
   }
 
-  const { data: rows } = await supabase
-    .from("v_leaderboard").select("*").eq("league_id", id).order("rank").limit(100);
-  const top3 = (rows ?? []).slice(0, 3);
+  const { data: rowsData } = await supabase
+    .rpc("leaderboard").eq("league_id", id).order("rank").limit(100);
+  const rows = (rowsData ?? []) as LeaderboardRow[];
+  const top3 = rows.slice(0, 3);
 
   const started = game.game_status !== "upcoming";
 

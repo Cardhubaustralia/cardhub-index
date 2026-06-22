@@ -58,10 +58,20 @@ export default async function RootLayout({
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+        {/* load the font without blocking first paint (swaps in when ready) */}
         <link
-          href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap"
           rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap"
+          media="print"
+          // eslint-disable-next-line react/no-unknown-property
+          {...{ onLoad: "this.media='all'" } as Record<string, string>}
         />
+        <noscript>
+          <link
+            rel="stylesheet"
+            href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap"
+          />
+        </noscript>
       </head>
       <body className="font-sans min-h-screen antialiased">
         <Navbar username={username} />
