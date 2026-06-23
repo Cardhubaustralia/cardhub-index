@@ -1,8 +1,9 @@
 import { Suspense } from "react";
 import { serverClient } from "@/lib/supabase/server";
 import MarketFilters, { SetOpt, RarityOpt, GameOpt } from "@/components/MarketFilters";
-import MarketGrid, { Universe } from "@/components/MarketGrid";
+import MarketGrid from "@/components/MarketGrid";
 import { SkeletonCardGrid } from "@/components/Skeletons";
+import type { Universe } from "@/lib/universe";
 
 export const dynamic = "force-dynamic";
 

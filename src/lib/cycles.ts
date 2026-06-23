@@ -1,6 +1,7 @@
-// Cycle state machine. Driven by a cron hitting /api/cron/tick (light,
-// every minute — state + execution only) and by `npm run cycle:tick`
-// (full, incl. the heavy price sync at lockout). Idempotent.
+// Cycle state machine. In production this runs as Supabase pg_cron
+// (`run_tick()` every minute — state + execution only). The full tick,
+// incl. the heavy price sync at lockout, is also available via
+// `npm run cycle:tick`. Idempotent.
 //
 // KEY DESIGN: execution does NOT depend on the price sync. Any cycle past
 // its execute time fills at the most recent prices, so trades always go

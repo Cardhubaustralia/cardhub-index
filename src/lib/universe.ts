@@ -1,10 +1,13 @@
-// Human-readable label for a game's card universe rules.
+// A game's tradeable card pool. Empty {} / null = every card. Rules are
+// ANDed and map directly onto v_market columns (game_slug, group_id,
+// rarity, name, is_sealed), so the market applies them as query filters.
+// Single source of truth — imported by actions, the market, and forms.
 export interface Universe {
   games?: string[];
   set_ids?: number[];
   rarities?: string[];
   name_like?: string;
-  sealed?: string;
+  sealed?: "any" | "only" | "exclude";
 }
 
 export function universeLabel(u: Universe | null | undefined): string {

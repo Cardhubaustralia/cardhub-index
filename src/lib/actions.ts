@@ -2,6 +2,7 @@
 // Player-facing server actions — thin wrappers over security-definer RPCs.
 import { revalidatePath } from "next/cache";
 import { serverClient } from "@/lib/supabase/server";
+import type { Universe } from "@/lib/universe";
 
 export interface ActionResult {
   ok: boolean;
@@ -37,13 +38,8 @@ export async function cancelOrder(orderId: string): Promise<ActionResult> {
   return { ok: true, message: "Order cancelled" };
 }
 
-export interface UniverseRules {
-  games?: string[];
-  set_ids?: number[];
-  rarities?: string[];
-  name_like?: string;
-  sealed?: "any" | "only" | "exclude";
-}
+// kept as an alias for back-compat; the shape lives in one place now
+export type UniverseRules = Universe;
 
 export async function createGame(input: {
   name: string;
@@ -65,6 +61,31 @@ export async function createGame(input: {
   if (error) return { ok: false, message: error.message };
   revalidatePath("/leagues");
   return { ok: true, message: "Game created", leagueId: data?.id };
+}
+
+// Owner-only: fix a game's settings or card pool. Only the fields the
+// owner changed are sent; undefined values are left untouched server-side.
+export async function updateGame(input: {
+  leagueId: string;
+  name?: string;
+  joinPolicy?: "open" | "invite";
+  maxPositionPct?: number;
+  endsAt?: string;
+  universe?: Universe;
+}): Promise<ActionResult> {
+  const supabase = await serverClient();
+  const { error } = await supabase.rpc("update_game", {
+    p_league_id: input.leagueId,
+    p_name: input.name ?? null,
+    p_join_policy: input.joinPolicy ?? null,
+    p_max_position_pct: input.maxPositionPct ?? null,
+    p_ends_at: input.endsAt ?? null,
+    p_universe: input.universe ?? null,
+  });
+  if (error) return { ok: false, message: error.message };
+  revalidatePath(`/leagues/${input.leagueId}`);
+  revalidatePath("/leagues");
+  return { ok: true, message: "Game updated" };
 }
 
 export async function joinLeague(code: string): Promise<ActionResult> {

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { serverClient } from "@/lib/supabase/server";
 import MarketCard from "@/components/MarketCard";
 import { MarketRow } from "@/components/CardTile";
+import type { Universe } from "@/lib/universe";
 
 const SORTS: Record<string, { col: string; asc: boolean }> = {
   popular: { col: "price", asc: false },
@@ -14,16 +15,6 @@ const PRICE_BANDS: Record<string, { min?: number; max?: number }> = {
   "": {}, "5-25": { min: 5, max: 25 }, "25-100": { min: 25, max: 100 },
   "100-500": { min: 100, max: 500 }, "500+": { min: 500 },
 };
-
-// A game's tradeable pool. Empty / null = every card. Rules are ANDed and
-// map directly onto v_market columns, so we apply them as query filters.
-export interface Universe {
-  games?: string[];
-  set_ids?: number[];
-  rarities?: string[];
-  name_like?: string;
-  sealed?: "any" | "only" | "exclude";
-}
 
 export interface MarketParams {
   game: string; q: string; sort: string; type: string;

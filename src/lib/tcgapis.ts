@@ -178,21 +178,3 @@ export function parseCsv(text: string): Record<string, string>[] {
   });
 }
 
-// Column names in the prices CSV can vary; resolve tolerantly.
-export function pick(row: Record<string, string>, candidates: string[]): string {
-  for (const c of candidates) {
-    if (row[c] !== undefined && row[c] !== "") return row[c];
-    const lower = Object.keys(row).find((k) => k.toLowerCase() === c.toLowerCase());
-    if (lower && row[lower] !== "") return row[lower];
-  }
-  return "";
-}
-
-export const COL = {
-  name: ["name", "productName"],
-  set: ["set", "expansionName", "expansion"],
-  variant: ["condition", "subTypeName", "printing", "variant"],
-  marketPrice: ["marketPrice", "market_price"],
-  price: ["price"],
-  lowPrice: ["lowPrice", "low_price"],
-};

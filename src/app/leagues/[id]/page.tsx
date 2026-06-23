@@ -4,6 +4,8 @@ import { serverClient } from "@/lib/supabase/server";
 import Leaderboard, { LeaderboardRow } from "@/components/Leaderboard";
 import JoinPublicButton from "@/components/JoinPublicButton";
 import GameCountdown from "@/components/GameCountdown";
+import GameAdminPanel from "@/components/GameAdminPanel";
+import { SetLite } from "@/components/CreateGameForm";
 import { universeLabel } from "@/lib/universe";
 import { Users, Trophy, Coins, Calendar } from "lucide-react";
 import { usd } from "@/lib/format";
@@ -31,6 +33,14 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
   const top3 = rows.slice(0, 3);
 
   const started = game.game_status !== "upcoming";
+  const isOwner = !!user && !game.is_global && game.owner_id === user.id;
+
+  let sets: SetLite[] = [];
+  if (isOwner) {
+    const { data: setData } = await supabase
+      .from("v_sets").select("slug, name, group_id, game_slug").order("name");
+    sets = (setData ?? []) as SetLite[];
+  }
 
   const stat = (Icon: typeof Users, label: string, value: string) => (
     <div className="panel flex items-center gap-3 px-4 py-3">
@@ -62,6 +72,21 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
           )}
         </div>
       </div>
+
+      {isOwner && (
+        <GameAdminPanel
+          leagueId={game.id}
+          sets={sets}
+          current={{
+            name: game.name,
+            join_policy: game.join_policy,
+            max_position_pct: Number(game.max_position_pct),
+            starts_at: game.starts_at,
+            ends_at: game.ends_at,
+            universe: game.universe,
+          }}
+        />
+      )}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {stat(Users, "Players", String(game.member_count))}
