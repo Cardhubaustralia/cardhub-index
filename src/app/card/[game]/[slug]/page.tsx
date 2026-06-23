@@ -6,7 +6,7 @@ import RangeChart from "@/components/RangeChart";
 import TradePanel, { LeagueCtx } from "@/components/TradePanel";
 import OrderFlow from "@/components/OrderFlow";
 import WatchButton from "@/components/WatchButton";
-import { usd, pct, pctClass } from "@/lib/format";
+import { usd, pct, pctClass, sanePct } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -204,8 +204,8 @@ export default async function CardPage({
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {stat("Prev cycle", usd(active.prev_price))}
-            {stat("7d change", pct(active.change_7d_pct), pctClass(active.change_7d_pct))}
-            {stat("30d change", pct(active.change_30d_pct), pctClass(active.change_30d_pct))}
+            {stat("7d change", pct(sanePct(active.change_7d_pct)), pctClass(sanePct(active.change_7d_pct)))}
+            {stat("30d change", pct(sanePct(active.change_30d_pct)), pctClass(sanePct(active.change_30d_pct)))}
             {stat("Source", active.price_source === "blend" ? "TCGP + CM blend" : "TCGPlayer")}
           </div>
 

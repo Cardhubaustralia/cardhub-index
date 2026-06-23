@@ -72,33 +72,19 @@ the function (must equal the `CRON_SECRET` above):
 update public.app_config set value = '<same-random-string>' where key = 'cron_secret';
 ```
 
-`edge_url` is pre-filled for this project. That's it — everything runs in
-Supabase. The GitHub "Price sync (manual fallback)" workflow remains for one-off
-full resyncs from your machine / the Actions tab.
+`edge_url` is pre-filled for this project. **Everything scheduled runs in
+Supabase — there is no GitHub Actions / Vercel cron.**
 
-### (legacy) GitHub Actions
+What runs where:
 
-Scheduling runs on **GitHub Actions**, not Vercel — the workflow runs the real
-Node script on the runner, so the multi-minute price sync has no serverless
-timeout, and it's free on any plan.
-
-Workflows (in `.github/workflows/`):
-
-- `cron-tick.yml` — every 5 min: opens/locks/executes cycles, syncs prices at lockout
-- `cron-catalog.yml` — daily: picks up new sets
-
-**One-time setup:** in the GitHub repo → Settings → Secrets and variables →
-Actions → New repository secret, add:
-
-- `SUPABASE_SECRET_KEY` — your `sb_secret_...` key
-- `TCGAPIS_API_KEY` — your TCGAPIs key
-
-That's it. The workflows run automatically once pushed. You can also trigger
-either one by hand from the repo's **Actions** tab (Run workflow).
-
-> The `/api/cron/*` HTTP endpoints still exist (protected by `CRON_SECRET`) if
-> you ever prefer Vercel Pro cron or an external curl scheduler, but they're not
-> used by default. Vercel cron is intentionally disabled in `vercel.json`.
+- **Execution** (`run_tick`) — pg_cron, every minute, pure SQL.
+- **Price sync** (`sync-prices` Edge Function) — pg_cron pings it every minute;
+  it chunk-syncs prices at each lockout.
+- **Daily notifications** (`notify_daily`) — pg_cron daily.
+- **Retention** (`archive_old_snapshots`) — pg_cron weekly.
+- **Catalog sync (new sets/cards)** — **manual**: run `npm run sync:catalog`
+  when a new set releases (they're infrequent). Can be promoted to an Edge
+  Function later if you want it automatic.
 
 ### Health check
 

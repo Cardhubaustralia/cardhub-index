@@ -11,6 +11,7 @@
     "sync:prices": "tsx scripts/sync-prices.ts",
     "cycle:tick": "tsx scripts/cycle-tick.ts",
     "notify:daily": "tsx scripts/notify-daily.ts",
+    "log:freshness": "tsx scripts/log-api-freshness.ts",
     "backfill": "tsx scripts/backfill-history.ts",
     "backfill:index": "tsx scripts/backfill-index.ts",
     "recompute": "tsx scripts/recompute.ts",

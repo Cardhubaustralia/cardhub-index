@@ -1,12 +1,12 @@
 import Link from "next/link";
 import Image from "next/image";
-import { usd, pct, pctClass } from "@/lib/format";
+import { usd, pct, pctClass, sanePct } from "@/lib/format";
 import { MarketRow } from "@/components/CardTile";
 
 export default function MarketCard({ row }: { row: MarketRow & {
   is_sealed?: boolean; published_on?: string | null;
 } }) {
-  const chg = row.change_7d_pct ?? row.change_pct ?? null;
+  const chg = sanePct(row.change_7d_pct ?? row.change_pct ?? null);
   return (
     <Link
       href={`/card/${row.game_slug}/${row.slug}?v=${encodeURIComponent(row.variant)}`}

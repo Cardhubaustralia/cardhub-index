@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { usd, pct, pctClass } from "@/lib/format";
+import { usd, pct, pctClass, sanePct } from "@/lib/format";
 
 export interface MarketRow {
   asset_id: number;
@@ -44,7 +44,7 @@ export default function CardTile({ row }: { row: MarketRow }) {
       <div className="text-right">
         <p className="font-black">{usd(row.price)}</p>
         {(() => {
-          const chg = row.change_7d_pct ?? row.change_pct ?? null;
+          const chg = sanePct(row.change_7d_pct ?? row.change_pct ?? null);
           return (
             <p className={`text-xs font-extrabold ${pctClass(chg)}`}>
               {pct(chg)} <span className="text-slate-300">7d</span>

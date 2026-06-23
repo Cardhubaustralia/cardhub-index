@@ -1,9 +1,11 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { browserClient } from "@/lib/supabase/client";
 
 export default function SignupPage() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
@@ -20,7 +22,7 @@ export default function SignupPage() {
       return setError("Username must be 3-20 letters, numbers, or underscores");
     }
     const supabase = browserClient();
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -30,6 +32,14 @@ export default function SignupPage() {
     });
     setLoading(false);
     if (error) return setError(error.message);
+    // If email confirmation is OFF, Supabase returns a session and the user
+    // is already signed in — go straight into the app. Otherwise show the
+    // "check your email" screen.
+    if (data.session) {
+      router.push("/portfolio");
+      router.refresh();
+      return;
+    }
     setDone(true);
   };
 
