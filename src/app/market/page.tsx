@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { serverClient } from "@/lib/supabase/server";
-import MarketFilters, { SetOpt, RarityOpt } from "@/components/MarketFilters";
-import MarketGrid from "@/components/MarketGrid";
+import MarketFilters, { SetOpt, RarityOpt, GameOpt } from "@/components/MarketFilters";
+import MarketGrid, { Universe } from "@/components/MarketGrid";
 import { SkeletonCardGrid } from "@/components/Skeletons";
 
 export const dynamic = "force-dynamic";
@@ -20,8 +20,28 @@ export default async function MarketPage({
   const rarity = sp.rarity ?? "";
   const band = sp.band ?? "";
   const showAll = sp.all === "1";
+  const league = sp.league ?? "";
   const pageNum = Math.max(1, parseInt(sp.page ?? "1") || 1);
   const supabase = await serverClient();
+
+  // Games (leagues) the signed-in user belongs to — for the "tradeable in"
+  // filter. Each game's `universe` defines its pool; an empty {} = all cards.
+  const { data: { user } } = await supabase.auth.getUser();
+  let myGames: GameOpt[] = [];
+  let universe: Universe | null = null;
+  if (user) {
+    const { data: mem } = await supabase
+      .from("league_members")
+      .select("leagues:league_id ( id, name, is_global, universe )")
+      .eq("user_id", user.id);
+    myGames = (mem ?? [])
+      .map((r) => (r as unknown as { leagues: GameOpt }).leagues)
+      .filter(Boolean)
+      // only games with a restricted pool are worth filtering by
+      .filter((g) => g.is_global || (g.universe && Object.keys(g.universe).length > 0));
+    if (league)
+      universe = (myGames.find((g) => g.id === league)?.universe as Universe) ?? null;
+  }
 
   // filter options (fast, needed for the bar to render immediately)
   const [{ data: setData }, { data: rarityData }] = await Promise.all([
@@ -38,7 +58,7 @@ export default async function MarketPage({
   const activeSetName = sets.find((x) => x.slug === setSlug)?.name;
 
   // key forces the grid Suspense to re-fall-back (show skeleton) on filter change
-  const gridKey = `${game}|${type}|${setSlug}|${rarity}|${band}|${sort}|${q}|${showAll}|${pageNum}`;
+  const gridKey = `${game}|${type}|${setSlug}|${rarity}|${band}|${sort}|${q}|${showAll}|${league}|${pageNum}`;
 
   return (
     <div className="space-y-4">
@@ -47,13 +67,14 @@ export default async function MarketPage({
       <MarketFilters
         game={game} type={type} set={setSlug} rarity={rarity} band={band}
         sort={sort} q={q} showAll={showAll} sets={sets} rarities={rarities}
+        league={league} games={myGames}
       />
 
       <Suspense key={gridKey} fallback={<div className="space-y-4"><div className="h-6 w-40 animate-pulse rounded bg-slate-200" /><SkeletonCardGrid /></div>}>
         <MarketGrid
           game={game} q={q} sort={sort} type={type} setSlug={setSlug}
           rarity={rarity} band={band} showAll={showAll} pageNum={pageNum}
-          activeSetName={activeSetName}
+          activeSetName={activeSetName} league={league} universe={universe}
         />
       </Suspense>
     </div>

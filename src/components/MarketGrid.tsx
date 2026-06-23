@@ -15,10 +15,22 @@ const PRICE_BANDS: Record<string, { min?: number; max?: number }> = {
   "100-500": { min: 100, max: 500 }, "500+": { min: 500 },
 };
 
+// A game's tradeable pool. Empty / null = every card. Rules are ANDed and
+// map directly onto v_market columns, so we apply them as query filters.
+export interface Universe {
+  games?: string[];
+  set_ids?: number[];
+  rarities?: string[];
+  name_like?: string;
+  sealed?: "any" | "only" | "exclude";
+}
+
 export interface MarketParams {
   game: string; q: string; sort: string; type: string;
   setSlug: string; rarity: string; band: string; showAll: boolean; pageNum: number;
   activeSetName?: string;
+  league?: string;
+  universe?: Universe | null;
 }
 
 export default async function MarketGrid(p: MarketParams) {
@@ -41,6 +53,17 @@ export default async function MarketGrid(p: MarketParams) {
   if (pb?.max != null) query = query.lte("price", pb.max);
   if (!p.showAll && pb?.min == null) query = query.gte("price", 5);
 
+  // Restrict to the selected game's tradeable pool (its universe rules).
+  const u = p.universe;
+  if (u && Object.keys(u).length > 0) {
+    if (u.games?.length) query = query.in("game_slug", u.games);
+    if (u.set_ids?.length) query = query.in("group_id", u.set_ids);
+    if (u.rarities?.length) query = query.in("rarity", u.rarities);
+    if (u.name_like) query = query.ilike("name", `%${u.name_like}%`);
+    if (u.sealed === "only") query = query.eq("is_sealed", true);
+    if (u.sealed === "exclude") query = query.eq("is_sealed", false);
+  }
+
   const { data: rows, count } = await query;
   const totalPages = Math.max(1, Math.ceil((count ?? 0) / pageSize));
 
@@ -48,6 +71,7 @@ export default async function MarketGrid(p: MarketParams) {
     const base: Record<string, string> = {
       game: p.game, q: p.q, sort: p.sort, type: p.type, set: p.setSlug,
       rarity: p.rarity, band: p.band, all: p.showAll ? "1" : "",
+      league: p.league ?? "",
     };
     return Object.entries({ ...base, ...over }).filter(([, v]) => v)
       .map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&");

@@ -2,15 +2,20 @@
 // Compact 2-line market filter bar. Auto-applies on change.
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Search, Package, Layers } from "lucide-react";
+import { Search, Package, Layers, Trophy } from "lucide-react";
 
 export interface SetOpt { slug: string; name: string; count: number }
 export interface RarityOpt { rarity: string; n: number }
+export interface GameOpt {
+  id: string; name: string; is_global?: boolean;
+  universe?: Record<string, unknown> | null;
+}
 
 interface Props {
   game: string; type: string; set: string; rarity: string; band: string;
   sort: string; q: string; showAll: boolean;
   sets: SetOpt[]; rarities: RarityOpt[];
+  league: string; games: GameOpt[];
 }
 
 const SORTS: [string, string][] = [
@@ -30,6 +35,7 @@ export default function MarketFilters(p: Props) {
     const base: Record<string, string> = {
       game: p.game, type: p.type, set: p.set, rarity: p.rarity,
       band: p.band, sort: p.sort, q, all: p.showAll ? "1" : "",
+      league: p.league,
     };
     const merged = { ...base, ...over, page: "" };
     const qs = Object.entries(merged).filter(([, v]) => v)
@@ -52,6 +58,9 @@ export default function MarketFilters(p: Props) {
   );
 
   const sel = "field w-auto py-1.5 text-sm";
+  const restricted = p.games.filter(
+    (g) => g.universe && Object.keys(g.universe).length > 0
+  );
 
   return (
     <div className="space-y-2">
@@ -62,6 +71,22 @@ export default function MarketFilters(p: Props) {
         <span className="mx-1 h-6 w-px bg-slate-200" />
         {tab("singles", "Singles", p.type, "type", Layers)}
         {tab("sealed", "Sealed", p.type, "type", Package)}
+        {restricted.length > 0 && (
+          <label className="inline-flex items-center gap-1.5">
+            <Trophy size={15} className="text-amber-500" />
+            <select
+              value={p.league}
+              onChange={(e) => push({ league: e.target.value })}
+              className={sel + (p.league ? " border-amber-300 text-amber-700" : "")}
+              title="Only show cards tradeable in this game"
+            >
+              <option value="">All cards</option>
+              {restricted.map((g) => (
+                <option key={g.id} value={g.id}>{g.name}</option>
+              ))}
+            </select>
+          </label>
+        )}
         <button
           onClick={() => push({ all: p.showAll ? "" : "1" })}
           className={
