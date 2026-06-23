@@ -24,16 +24,21 @@ function LoginForm() {
     router.refresh();
   };
 
+  const keepInView = (e: React.FocusEvent<HTMLInputElement>) => {
+    const el = e.target;
+    setTimeout(() => el.scrollIntoView({ block: "center", behavior: "smooth" }), 300);
+  };
+
   return (
-    <div className="mx-auto max-w-md pt-10">
+    <div className="mx-auto max-w-md px-4 pb-24 pt-10">
       <form onSubmit={submit} className="panel space-y-4 p-8">
         <h1 className="text-2xl font-black">Welcome back</h1>
         <input
-          type="email" required placeholder="Email" className="field"
+          type="email" required placeholder="Email" className="field" onFocus={keepInView}
           value={email} onChange={(e) => setEmail(e.target.value)}
         />
         <input
-          type="password" required placeholder="Password" className="field"
+          type="password" required placeholder="Password" className="field" onFocus={keepInView}
           value={password} onChange={(e) => setPassword(e.target.value)}
         />
         {error && (

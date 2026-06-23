@@ -8,6 +8,7 @@ export default function SignupPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
   const [username, setUsername] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -20,6 +21,14 @@ export default function SignupPage() {
     if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) {
       setLoading(false);
       return setError("Username must be 3-20 letters, numbers, or underscores");
+    }
+    if (password.length < 8) {
+      setLoading(false);
+      return setError("Password must be at least 8 characters");
+    }
+    if (password !== confirm) {
+      setLoading(false);
+      return setError("Passwords don't match");
     }
     const supabase = browserClient();
     const { data, error } = await supabase.auth.signUp({
@@ -43,6 +52,13 @@ export default function SignupPage() {
     setDone(true);
   };
 
+  // On mobile the on-screen keyboard overlays the lower fields; nudge the
+  // focused input into the middle of the viewport once the keyboard opens.
+  const keepInView = (e: React.FocusEvent<HTMLInputElement>) => {
+    const el = e.target;
+    setTimeout(() => el.scrollIntoView({ block: "center", behavior: "smooth" }), 300);
+  };
+
   if (done) {
     return (
       <div className="mx-auto max-w-md pt-10">
@@ -58,24 +74,33 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="mx-auto max-w-md pt-10">
+    <div className="mx-auto max-w-md px-4 pb-24 pt-10">
       <form onSubmit={submit} className="panel space-y-4 p-8">
         <h1 className="text-2xl font-black">Join CardHub Index</h1>
         <p className="-mt-2 text-sm font-bold text-slate-500">
           Start with $10,000 of virtual cash and trade real card prices.
         </p>
         <input
-          required placeholder="Username" className="field"
+          required placeholder="Username" className="field" onFocus={keepInView}
           value={username} onChange={(e) => setUsername(e.target.value)}
         />
         <input
-          type="email" required placeholder="Email" className="field"
+          type="email" required placeholder="Email" className="field" onFocus={keepInView}
           value={email} onChange={(e) => setEmail(e.target.value)}
         />
         <input
           type="password" required minLength={8} placeholder="Password (8+ characters)"
+          autoComplete="new-password" onFocus={keepInView}
           className="field" value={password} onChange={(e) => setPassword(e.target.value)}
         />
+        <input
+          type="password" required minLength={8} placeholder="Confirm password"
+          autoComplete="new-password" onFocus={keepInView}
+          className="field" value={confirm} onChange={(e) => setConfirm(e.target.value)}
+        />
+        {confirm.length > 0 && confirm !== password && (
+          <p className="-mt-1 text-xs font-bold text-rose-600">Passwords don&apos;t match</p>
+        )}
         {error && (
           <p className="rounded-2xl bg-rose-50 px-4 py-2 text-sm font-bold text-rose-700">
             {error}
