@@ -1,7 +1,7 @@
 "use client";
 // Live countdown: shows trading-open time remaining, then the lockout phase.
 import { useEffect, useState } from "react";
-import { Lock, Zap, Hourglass } from "lucide-react";
+import { Lock, Zap, Hourglass, Flame } from "lucide-react";
 
 function fmt(ms: number) {
   if (ms <= 0) return "0:00";
@@ -16,9 +16,11 @@ function fmt(ms: number) {
 export default function CountdownBar({
   locksAt,
   executesAt,
+  pendingCount = 0,
 }: {
   locksAt: string;
   executesAt: string;
+  pendingCount?: number;
 }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -46,6 +48,15 @@ export default function CountdownBar({
       }
     >
       <div className="mx-auto flex max-w-6xl items-center justify-center gap-2 px-4 py-2">
+        {pendingCount > 0 && (
+          <span
+            className="mr-1 inline-flex items-center gap-1 rounded-full bg-white/70 px-2.5 py-0.5 text-xs font-black shadow-sm ring-1 ring-black/5"
+            title="Trades locked in for this lockout (all players)"
+          >
+            <Flame size={13} className="text-orange-500" />
+            {pendingCount.toLocaleString()} {pendingCount === 1 ? "trade" : "trades"} locked in
+          </span>
+        )}
         {phase === "open" && (
           <>
             <Hourglass size={15} />

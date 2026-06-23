@@ -60,9 +60,30 @@ export default async function MarketPage({
   // key forces the grid Suspense to re-fall-back (show skeleton) on filter change
   const gridKey = `${game}|${type}|${setSlug}|${rarity}|${band}|${sort}|${q}|${showAll}|${league}|${pageNum}`;
 
+  const scopedGame = league ? myGames.find((g) => g.id === league) : null;
+
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-black">Market</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-2xl font-black">
+          {scopedGame ? `${scopedGame.name} market` : "Market"}
+        </h1>
+        {scopedGame && (
+          <a
+            href="/market"
+            className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-extrabold text-slate-500 hover:bg-slate-200"
+          >
+            ✕ Show all cards
+          </a>
+        )}
+      </div>
+
+      {scopedGame && (
+        <div className="flex items-center gap-2 rounded-2xl border-2 border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-extrabold text-amber-800">
+          <span className="text-base">🏆</span>
+          Showing only cards you can trade in <span className="underline">{scopedGame.name}</span>.
+        </div>
+      )}
 
       <MarketFilters
         game={game} type={type} set={setSlug} rarity={rarity} band={band}

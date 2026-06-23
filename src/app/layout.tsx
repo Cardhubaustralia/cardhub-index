@@ -53,6 +53,13 @@ export default async function RootLayout({
     nextCycle = data;
   }
 
+  // how many trades the whole field has locked in for this lockout
+  let pendingCount = 0;
+  if (nextCycle) {
+    const { data: pc } = await supabase.rpc("pending_cycle_orders");
+    pendingCount = typeof pc === "number" ? pc : 0;
+  }
+
   return (
     <html lang="en">
       <head>
@@ -79,6 +86,7 @@ export default async function RootLayout({
           <CountdownBar
             locksAt={nextCycle.locks_at}
             executesAt={nextCycle.executes_at}
+            pendingCount={pendingCount}
           />
         )}
         <main className="mx-auto max-w-6xl px-4 pb-24 pt-6 sm:pb-16">{children}</main>
